@@ -25,11 +25,18 @@ df$icpevdrain <- factor(df$icpevdrain, levels=c(0,1), labels=c("No","Yes"))
 df <- df %>%
   mutate(
     withdrawallst = factor(withdrawallst, levels = c(1,2), labels = c("Yes","No")),
-    tbimidlineshift = factor(tbimidlineshift, levels = c(1,2,3), labels = c("Yes","No",NA)),
+    tbimidlineshift = case_when(
+      is.na(tbimidlineshift) ~ NA_character_,
+      tbimidlineshift == 1 ~ "Yes",
+      tbimidlineshift == 2 ~ "No",
+      tbimidlineshift == 3 ~ NA_character_,
+      TRUE ~ NA_character_   # optional: make unexpected codes NA (or change to "Unknown")
+    ) %>% factor(levels = c("Yes","No")),
     ich_category = factor(ich_category),
     statedesignation = factor(statedesignation),
-    hospdischargedisposition=factor(hospdischargedisposition)
+    hospdischargedisposition = factor(hospdischargedisposition)
   )
+
 
 
 ###### Summarize the data ######
