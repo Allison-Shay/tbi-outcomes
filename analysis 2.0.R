@@ -11,7 +11,7 @@ library(lmtest)
 
 df <- read.csv("merged years.csv")
 
-df$minority <- factor(df$minority, levels=c(0,1), labels=c("Other","Minority"))
+df$minority <- factor(df$minority, levels=c(0,1), labels=c("White","Minority"))
 df$sex <- factor(df$sex, levels=c(1,2), labels=c("Male","Female"))
 df$teachingstatus <- factor(df$teachingstatus)
 df$verificationlevel <- factor(df$verificationlevel)
