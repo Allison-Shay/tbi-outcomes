@@ -1,23 +1,15 @@
 library(stringr)
 library(tidyverse)
-#library(factoextra)
-#library(Hmisc)
-#library(corrplot)
 library(dplyr)
-#library(ggplot2)
-#library(scales)
-#library(knitr)
-#library(broom)    # for tidy test output
-library(MatchIt)  # optional later for PS matching
+library(MatchIt)  # For propensity matching
 library(readr)
 library(cobalt) # For post-match balance checks
 library(sandwich)
 library(lmtest)
 
-setwd("/Users/hunter/Downloads/Carilion/current attempt")
-df <- read.csv("merged years.csv")
-colnames(df)
+###### Read in the data ######
 
+df <- read.csv("merged years.csv")
 
 df$minority <- factor(df$minority, levels = c(0,1), labels = c("White","Minority"))
 df$sex <- factor(df$sex, levels=c(1,2), labels=c("Male","Female"))
@@ -32,11 +24,74 @@ df$icpevdrain <- factor(df$icpevdrain, levels=c(0,1), labels=c("No","Yes"))
 
 df <- df %>%
   mutate(
-    withdrawallst = factor(withdrawallst, levels = c(0,1), labels = c("No","Yes")),
-    tbimidlineshift = factor(tbimidlineshift, levels = c(0,1), labels = c("No","Yes")),
+    withdrawallst = factor(withdrawallst, levels = c(1,2), labels = c("Yes","No")),
+    tbimidlineshift = factor(tbimidlineshift, levels = c(1,2,3), labels = c("Yes","No",NA)),
     ich_category = factor(ich_category),
-    statedesignation = factor(statedesignation)
+    statedesignation = factor(statedesignation),
+    hospdischargedisposition=factor(hospdischargedisposition)
   )
+
+
+###### Summarize the data ######
+
+max_levels_to_print <- 10  # threshold for printing categories
+
+summary_df <- data.frame(
+  column = character(),
+  type = character(),
+  na_count = integer(),
+  value_summary = character(),
+  stringsAsFactors = FALSE
+)
+
+for (col_name in names(df)) {
+  x <- df[[col_name]]
+  n_na <- sum(is.na(x))
+  x_no_na <- x[!is.na(x)]
+
+  # Numerical
+  if (is.numeric(x)) {
+    type <- "numerical"
+    if (length(x_no_na) == 0) {
+      value_summary <- "all values are NA"
+    } else {
+      value_summary <- paste0(
+        min(x_no_na), " to ", max(x_no_na)
+      )
+    }
+
+  # Categorical
+  } else {
+    type <- "categorical"
+    levels <- unique(x_no_na)
+    n_levels <- length(levels)
+
+    if (n_levels <= max_levels_to_print) {
+      value_summary <- paste(levels, collapse = ", ")
+    } else {
+      value_summary <- paste(n_levels, "categories")
+    }
+  }
+
+  summary_df <- rbind(
+    summary_df,
+    data.frame(
+      column = col_name,
+      type = type,
+      na_count = n_na,
+      value_summary = value_summary,
+      stringsAsFactors = FALSE
+    )
+  )
+}
+
+options(width = 300)
+print(summary_df[order(summary_df$type, decreasing=TRUE),], row.names = FALSE)
+cat("Rows:", nrow(df), "\nColumns:", ncol(df), "\n")
+
+
+##########
+
 
 cont_vars <- c("ageyears","totalgcs","ais_head","ais_nonhead",
                "iss","totalventdays","totaliculos","finaldischargedays",
