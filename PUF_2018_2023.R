@@ -2,46 +2,25 @@ library(stringr)
 library(tidyverse)
 library(dplyr)
 library(readr)
-#library(factoextra)
-#library(Hmisc)
-#library(corrplot)
-#library(ggplot2)
-#library(scales)
-#library(knitr)
-#library(broom)    # for tidy test output
-#library(MatchIt)  # optional later for PS matching
 
+### The directory structure of the data ###
 
-#CHANGE THE YEAR ONLY FOR SETWD
-setwd("/Users/hunter/Downloads/Carilion/TQIP 2007-2023/PUF AY 2018/CSV")
-df <- read.csv("PUF_TRAUMA.csv")
-#df_ais_lookup <- read.csv("PUF_AISDIAGNOSIS_LOOKUP.csv")
-df_ais <- read.csv("PUF_AISDIAGNOSIS.csv")
-df_icdproc <- read.csv("PUF_ICDPROCEDURE.csv")
-df_icddiag<-read.csv("PUF_ICDDIAGNOSIS.csv")
-#df_icdproc_lookup <- read.csv("PUF_ICDPROCEDURE_LOOKUP.csv")
-#head(df_icdproc_lookup)
+make_path <- function(x, y) {
+  sprintf("./TQIP 2007-2023/PUF AY %s/CSV/%s", x, y)
+}
 
-# lowercase column names
-colnames(df) <- tolower(colnames(df))
-#colnames(df_ais_lookup) <- tolower(colnames(df_ais_lookup))
-colnames(df_ais) <- tolower(colnames(df_ais))
-colnames(df_icdproc) <- tolower(colnames(df_icdproc))
-#colnames(df_icdproc_lookup) <- tolower(colnames(df_icdproc_lookup))
-colnames(df_icddiag) <- tolower(colnames(df_icddiag))
-length(unique(df$inc_key))
+### Year to analyze ###
 
-df <- df %>% filter(ageyears >= 18)
-df <- df[, !grepl("_biu$", names(df))] #drop BIU columns
-#colnames(df)
-#nrow(df) 
-#ncol(df) 
+year <- 2023
 
+### Filtering criteria ###
 
+# Age
+min_ageyears <- 18
 # List of trach ICD codes
 trach_codes <- c("0B110F4", "0B110Z4", "0B113F4", "0B113Z4", "0B114F4", "0B114Z4")
 # list of gastrostomy codes
-gastro_codes<-c("0DH60UZ", "0DH63UZ", "0DH64UZ", "0DH68UZ")
+gastro_codes <- c("0DH60UZ", "0DH63UZ", "0DH64UZ", "0DH68UZ")
 # list of craniotomy codes
 crani_codes <- c("0N500ZZ","0N503ZZ","0N504ZZ","0N510ZZ","0N513ZZ","0N514ZZ","0N520ZZ","0N523ZZ","0N524ZZ","0N530ZZ","0N533ZZ","0N534ZZ","0N540ZZ","0N543ZZ","0N544ZZ","0N550ZZ","0N553ZZ","0N554ZZ","0N560ZZ","0N563ZZ","0N564ZZ","0N570ZZ","0N573ZZ","0N574ZZ","0N580ZZ","0N583ZZ","0N584ZZ",
                  "009430Z", "00943ZZ", "009440Z", "0N9000Z", "0N900ZZ", "0N9040Z", "0N904ZZ",
@@ -64,7 +43,6 @@ crani_codes <- c("0N500ZZ","0N503ZZ","0N504ZZ","0N510ZZ","0N513ZZ","0N514ZZ","0N
                  "0NS035Z", "0NS03ZZ", "0NS044Z", "0NS045Z", "0NS04ZZ", "0NS0XZZ", "00Q20ZZ",
                  "00Q23ZZ", "00Q24ZZ", "00560ZZ", "00563ZZ", "00564ZZ", "00Q00ZZ", "00Q03ZZ",
                  "00Q04ZZ", "0NQ0XZZ",
-                 
                  "00963ZZ", "00964ZZ", "009130Z", "00913ZZ", "009140Z", "00914ZZ", "009230Z",
                  "00923ZZ", "009240Z", "00924ZZ", "4A003BD", "4A007BD", "4A103BD", "4A107BD",
                  "4A003RD", "4A007RD", "4A103RD", "4A107RD", "4A003KD", "4A007KD", "4A103KD",
@@ -77,21 +55,47 @@ crani_codes <- c("0N500ZZ","0N503ZZ","0N504ZZ","0N510ZZ","0N513ZZ","0N514ZZ","0N
                  "009640Z")
 
 
-#midline shift is AIS predot codes but actually there's already a binary category
-#midline_codes<-c("140608","140616","140624")
+### Load data files ###
 
 
-#crani code pts only
+# Identify columns ending in _biu (case-insensitive)
+drop <- grepl("_biu$", cols, ignore.case = TRUE)
+
+# Build colClasses: "NULL" drops the column
+colClasses <- ifelse(drop, "NULL", NA)
+
+# Read data without those columns
+df <- read.csv("file.csv", colClasses = colClasses)
+
+# Don't load columns that end in _biu (these columns just tell you whether something is "Not applicable" vs. "Not known/recorded"
+cols <- names(read.csv(make_path(year, "PUF_TRAUMA.csv"), nrows = 1))
+drop <- grepl("_biu$", cols, ignore.case = TRUE)
+colClasses <- ifelse(drop, "NULL", NA)
+df <- read.csv(make_path(year, "PUF_TRAUMA.csv"), colClasses = colClasses)
+df_ais <- read.csv(make_path(year, "PUF_AISDIAGNOSIS.csv"))
+df_icdproc <- read.csv(make_path(year, "PUF_ICDPROCEDURE.csv"))
+df_icddiag <- read.csv(make_path(year, "PUF_ICDDIAGNOSIS.csv"))
+# lowercase column names
+colnames(df) <- tolower(colnames(df))
+colnames(df_ais) <- tolower(colnames(df_ais))
+colnames(df_icdproc) <- tolower(colnames(df_icdproc))
+colnames(df_icddiag) <- tolower(colnames(df_icddiag))
+
+### Filter the loaded data ###
+
+df <- df %>% filter(ageyears >= min_ageyears)
+
+# crani code pts only
 df_icdproc_crani <- df_icdproc %>%
   filter(icdprocedurecode %in% crani_codes)
 crani_inc_keys <- df_icdproc_crani %>%
   pull(inc_key) %>%
   unique()
-crani_inc_keys
-length(crani_inc_keys) # so these are the inclusion keys
+
+# crani_inc_keys are the inclusion keys
 
 df_crani <- df %>%
-  filter(inc_key %in% crani_inc_keys) #51 rows in 2022
+  filter(inc_key %in% crani_inc_keys)
 
 # Merge df_crani (patient-level) with df_icdproc (procedure-level)
 df_crani <- df_crani %>%
@@ -103,14 +107,10 @@ df_crani <- df_crani %>%
   summarise(
     # keep first for all patient-level columns except icdprocedurecode
     across(-icdprocedurecode, first),
-    
     # collapse all ICD procedure codes into one string
     icd_procedures = paste(icdprocedurecode, collapse = "; ")
   ) %>%
   ungroup()
-
-colnames(df_crani)[grepl("icdprocedurecode", colnames(df_crani))]
-
 
 # Merge df_crani (patient-level) with df_icddiag
 df_crani <- df_crani %>%
@@ -127,7 +127,6 @@ df_crani <- df_crani %>%
     icd_diagnoses = paste(icddiagnosiscode, collapse = "; ")
   ) %>%
   ungroup()
-
 
 #ICH codes
 # Define ICH type patterns
@@ -162,34 +161,25 @@ df_crani <- df_crani %>%
     )
   )
 
-table(df_crani$ich_category)
 
-
-
-#make minority column
+# Make minority column
 race_cols <- c("americanindian", "asian", "black", 
                "pacificislander", "raceother")
-
 df_crani$minority <- ifelse(
   df_crani$white == 1, 
   0,
   ifelse(rowSums(df_crani[race_cols]) > 0, 1, NA)
 )
-
-table(df_crani$minority, useNA = "ifany")
-
-
 colnames(df_crani) <- tolower(colnames(df_crani))
-colnames(df_crani)
 
-df_crani <- df_crani %>%
-  rename(
-    iss = iss_05,
-    )
+# Rename certain variables 
+if ("iss_05" %in% names(df_crani) && !"iss" %in% names(df_crani)) {
+  names(df_crani)[names(df_crani) == "iss_05"] <- "iss"
+}
+if ("losdays" %in% names(df_crani) && !"finaldischargedays" %in% names(df_crani)) {
+  names(df_crani)[names(df_crani) == "losdays"] <- "finaldischargedays"
+}
 
-df_crani <- df_crani %>%
-  rename(finaldischargedays = losdays
-  )
 df_crani <- df_crani %>%
   rename(tbicerebralmonitordays = cerebralmonitordays,
          tbicerebralmonitorhrs = cerebralmonitormins
