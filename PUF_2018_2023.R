@@ -179,15 +179,18 @@ if ("iss_05" %in% names(df_crani) && !"iss" %in% names(df_crani)) {
 if ("losdays" %in% names(df_crani) && !"finaldischargedays" %in% names(df_crani)) {
   names(df_crani)[names(df_crani) == "losdays"] <- "finaldischargedays"
 }
-
-df_crani <- df_crani %>%
-  rename(tbicerebralmonitordays = cerebralmonitordays,
-         tbicerebralmonitorhrs = cerebralmonitormins
-        )
-         
-df_crani <- df_crani %>%
-  rename(hospitalprocedurestarthrs = proceduremins,
-         hospitalprocedurestartdays = proceduredays)
+if ("cerebralmonitordays" %in% names(df_crani) && !"tbicerebralmonitordays" %in% names(df_crani)) {
+  names(df_crani)[names(df_crani) == "cerebralmonitordays"] <- "tbicerebralmonitordays"
+}
+if ("cerebralmonitormins" %in% names(df_crani) && !"tbicerebralmonitorhrs" %in% names(df_crani)) {
+  names(df_crani)[names(df_crani) == "cerebralmonitormins"] <- "tbicerebralmonitorhrs"
+}
+if ("proceduremins" %in% names(df_crani) && !"hospitalprocedurestarthrs" %in% names(df_crani)) {
+  names(df_crani)[names(df_crani) == "proceduremins"] <- "hospitalprocedurestarthrs"
+}
+if ("proceduredays" %in% names(df_crani) && !"hospitalprocedurestartdays" %in% names(df_crani)) {
+  names(df_crani)[names(df_crani) == "proceduredays"] <- "hospitalprocedurestartdays"
+}
 
 # YEAR MATTERS HERE
 #pull the variables from email
