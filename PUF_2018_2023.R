@@ -128,6 +128,9 @@ df_crani <- df_crani %>%
   ) %>%
   ungroup()
 
+
+### Make relevant columns ###
+
 #ICH codes
 # Define ICH type patterns
 df_crani <- df_crani %>%
@@ -161,7 +164,6 @@ df_crani <- df_crani %>%
     )
   )
 
-
 # Make minority column
 race_cols <- c("americanindian", "asian", "black", 
                "pacificislander", "raceother")
@@ -171,6 +173,8 @@ df_crani$minority <- ifelse(
   ifelse(rowSums(df_crani[race_cols]) > 0, 1, NA)
 )
 colnames(df_crani) <- tolower(colnames(df_crani))
+
+### Finalize our column names (renaming columns if necessary since different years have different column names) ###
 
 # Rename certain variables 
 if ("iss_05" %in% names(df_crani) && !"iss" %in% names(df_crani)) {
@@ -192,9 +196,9 @@ if ("proceduredays" %in% names(df_crani) && !"hospitalprocedurestartdays" %in% n
   names(df_crani)[names(df_crani) == "proceduredays"] <- "hospitalprocedurestartdays"
 }
 
-# YEAR MATTERS HERE
-#pull the variables from email
-df_crani1 <- df_crani %>%
+### Finally, subset our data frame to only contain our columns of interest ###
+
+df_crani <- df_crani %>%
   select(
     inc_key,
     sex,
@@ -203,75 +207,29 @@ df_crani1 <- df_crani %>%
     verificationlevel,
     teachingstatus,
     totalgcs,
-    iss, #remove_05 for later years
+    iss,
     totalventdays,
     totaliculos,
-    #losdays, #for 2018 
-    finaldischargedays, # for 2019,2020
-    #inpatientdays, #for later years; 
+    finaldischargedays,
     hospdischargedisposition,
     icpparench,
     icpevdrain,
     icd_procedures,
     icd_diagnoses,
     ich_category,
-   
-     #emsmins,retired after 2018?
-    #emsresponsemins,retired after 2018?
-   # emsscenemins,retired after 2018?
-   # hospitalarrivalhrs, new var
-   # hospitalarrivaldays, new var
     withdrawallst,
     withdrawallstdays,
-   # withdrawallstmins,retired after 2018
     statedesignation,
-   # tccskullfracture, Flattened many-to-one response values from Trauma Center Criteria -> retired 2020
-  
-    # cerebralmonitordays, #2018
-   # cerebralmonitormins, #2018
-    tbicerebralmonitordays, #any yr after
-    tbicerebralmonitorhrs, #any yr after
-    
+    tbicerebralmonitordays,
+    tbicerebralmonitorhrs,
     tbimidlineshift,
-    hospitalprocedurestarthrs, #proceduremins
-    hospitalprocedurestartdays #proceduredays
+    hospitalprocedurestarthrs,
+    hospitalprocedurestartdays
   )
-nrow(df_crani1)#51 for 2022, 63 for 2018
-
-# YEAR MATTERS HERE
-#for 2018
-cols_to_keep <- c("inc_key","sex","ageyears","minority","verificationlevel",
-                  "teachingstatus","totalgcs","iss_05","totalventdays",
-                  "totaliculos","losdays","hospdischargedisposition",
-                  "icpparench","icpevdrain","icd_procedures",
-                  "icd_diagnoses","ich_category","withdrawallst","withdrawallstdays",
-                  "statedesignation","cerebralmonitordays","cerebralmonitormins",
-                  "tbimidlineshift","hospitalprocedurestarthrs","hospitalprocedurestartdays")
-
-#for 2019,2020
-cols_to_keep <- c("inc_key","sex","ageyears","minority","verificationlevel",
-                  "teachingstatus","totalgcs","iss_05","totalventdays",
-                  "totaliculos","finaldischargedays","hospdischargedisposition",
-                  "icpparench","icpevdrain","icd_procedures",
-                  "icd_diagnoses","ich_category","withdrawallst","withdrawallstdays",
-                  "statedesignation","tbicerebralmonitordays",)
-
-#I think I standardized the variables see above
-cols_to_keep <- c("inc_key","sex","ageyears","minority","verificationlevel",
-                  "teachingstatus","totalgcs","iss","totalventdays",
-                  "totaliculos","finaldischargedays","hospdischargedisposition",
-                  "icpparench","icpevdrain","icd_procedures",
-                  "icd_diagnoses","ich_category","withdrawallst","withdrawallstdays",
-                  "statedesignation","tbicerebralmonitordays","tbicerebralmonitormins",
-                  "tbimidlineshift","hospitalprocedurestarthrs","hospitalprocedurestartdays")
 
 
-# Keep only those that exist in df_crani
-cols_to_keep <- intersect(cols_to_keep, colnames(df_crani))
-df_crani1 <- df_crani %>% select(all_of(cols_to_keep))
+### Make a trach and gastro column based on ICD procedure codes ###
 
-
-#now make a trach and gastro column
 df_crani1 <- df_crani1 %>%
   mutate(trach = ifelse(
     str_detect(icd_procedures, str_c(trach_codes, collapse = "|")),
@@ -284,11 +242,7 @@ df_crani1 <- df_crani1 %>%
     1, 0
   ))
 
-print(head(df_crani1), width = Inf)
-# Count
-table(df_crani1$trach)
-table(df_crani1$gastro)
-
+### Make columns based on injury code (AIS) ###
 
 # Head injuries only
 df_head <- df_ais %>% filter(str_detect(aispredot, "^1"))
@@ -309,18 +263,20 @@ ais_summary <- ais_head %>%
 
 df_crani1 <- df_crani1 %>%
   left_join(ais_summary, by = "inc_key")
-print(df_crani1, n = 10, width = Inf)
 
-#Patients with isolated blunt TBI defined as patients with any Head-Abbreviated Injury Scale (AIS) and non-Head AIS score <3.
+### Filter based on injury codes ###
+
+# Patients with isolated blunt TBI defined as patients with any Head-Abbreviated Injury Scale (AIS) and non-Head AIS score <3.
+
 isolated_tbi <- df_crani1 %>%
   mutate(ais_nonhead = ifelse(is.na(ais_nonhead), 0, ais_nonhead)) %>%
-  filter(ais_head >= 1 & ais_nonhead < 3)
+  filter(ais_head > 1 & ais_nonhead < 3)
 
-#YEAR MATTERS HERE
-#for older years, change teaching status 0 = nonteaching 1= university
+### Make dataset consistent across years ###
+
+# for older years, change teaching status 0 = nonteaching 1= university
 # --- Clean & convert teachingstatus for isolated_tbi only ---
 if ("teachingstatus" %in% names(isolated_tbi)) {
-  
   isolated_tbi$teachingstatus <- isolated_tbi$teachingstatus |>
     tolower() |>
     trimws() |>
@@ -329,14 +285,12 @@ if ("teachingstatus" %in% names(isolated_tbi)) {
       "community" = "0",
       "nonteaching" = "0"
     )
-  
   isolated_tbi$teachingstatus <- as.integer(isolated_tbi$teachingstatus)
 }
 
 #for 2020, change teaching status 0 = nonteaching 1= university
 # --- Clean & convert teachingstatus for isolated_tbi only ---
 if ("teachingstatus" %in% names(isolated_tbi)) {
-  
   isolated_tbi$teachingstatus <- isolated_tbi$teachingstatus |>
     tolower() |>
     trimws() |>
@@ -345,15 +299,11 @@ if ("teachingstatus" %in% names(isolated_tbi)) {
       "community" = "0",
       "nonteaching" = "0"
     )
-  
   isolated_tbi$teachingstatus <- as.integer(isolated_tbi$teachingstatus)
 }
 
-#for 2021 after teaching status
+#for 2021 after teaching status (academic is 1, others are 0)
 isolated_tbi$teachingstatus <- ifelse(isolated_tbi$teachingstatus == 1, 1, 0)
-
-
-print(isolated_tbi, n = 10, width = Inf)
 
 
 #write_csv(isolated_tbi, "/Users/hunter/Downloads/Carilion/current attempt/2018cleaned.csv")
