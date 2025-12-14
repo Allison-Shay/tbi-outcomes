@@ -316,7 +316,7 @@ if (!dir.exists(output_path)) {
 }
 
 write_csv(isolated_tbi, paste(output_path, "/", year, "cleaned.csv", sep=""))
-write_csv(isolated_tbi, paste(filter_log, "/", year, "filtering_summary.csv", sep=""))
+write_csv(filter_log, paste(output_path, "/", year, "filtering_summary.csv", sep=""))
 
 
 
