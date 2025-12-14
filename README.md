@@ -2,7 +2,7 @@
 
 ## 1. Setup
 
-This was performed using **R version 4.5.2 (2025-10-31)** and the following R packages:
+This was performed using **R version 4.1.3** and **R version 4.5.2 (2025-10-31)** and the following R packages:
 
 <pre>required_packages <- c(
   "tidyverse",
