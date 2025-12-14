@@ -62,16 +62,6 @@ crani_codes <- c("0N500ZZ","0N503ZZ","0N504ZZ","0N510ZZ","0N513ZZ","0N514ZZ","0N
 
 ### Load data files ###
 
-
-# Identify columns ending in _biu (case-insensitive)
-drop <- grepl("_biu$", cols, ignore.case = TRUE)
-
-# Build colClasses: "NULL" drops the column
-colClasses <- ifelse(drop, "NULL", NA)
-
-# Read data without those columns
-df <- read.csv("file.csv", colClasses = colClasses)
-
 # Don't load columns that end in _biu (these columns just tell you whether something is "Not applicable" vs. "Not known/recorded"
 cols <- names(read.csv(make_path(year, "PUF_TRAUMA.csv"), nrows = 1))
 drop <- grepl("_biu$", cols, ignore.case = TRUE)
