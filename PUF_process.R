@@ -289,7 +289,7 @@ if ("teachingstatus" %in% names(isolated_tbi)) {
   isolated_tbi$teachingstatus <- dplyr::case_when(
     ts %in% c("academic", "university") ~ 1L,
     ts %in% c("community", "nonteaching") ~ 0L,
-    ts %in% c("0", "1") ~ as.integer(ts),
+    ts %in% c("0", "1", "2", "3", "4", "5", "6", "7", "8", "9") ~ as.integer(ts),
     TRUE ~ NA_integer_
   )
 }
