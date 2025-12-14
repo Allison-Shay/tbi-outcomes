@@ -295,15 +295,17 @@ if ("teachingstatus" %in% names(isolated_tbi)) {
 #for 2020, change teaching status 0 = nonteaching 1= university
 # --- Clean & convert teachingstatus for isolated_tbi only ---
 if ("teachingstatus" %in% names(isolated_tbi)) {
-  isolated_tbi$teachingstatus <- isolated_tbi$teachingstatus |>
+  ts <- isolated_tbi$teachingstatus |>
+    as.character() |>
     tolower() |>
-    trimws() |>
-    recode(
-      "academic" = "1",
-      "community" = "0",
-      "nonteaching" = "0"
-    )
-  isolated_tbi$teachingstatus <- as.integer(isolated_tbi$teachingstatus)
+    trimws()
+
+  isolated_tbi$teachingstatus <- dplyr::case_when(
+    ts %in% c("academic", "university") ~ 1L,
+    ts %in% c("community", "nonteaching") ~ 0L,
+    ts %in% c("0", "1") ~ as.integer(ts),
+    TRUE ~ NA_integer_
+  )
 }
 
 #for 2021 after teaching status (academic is 1, others are 0)
