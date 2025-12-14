@@ -14,6 +14,10 @@ make_path <- function(x, y) {
 args <- commandArgs(trailingOnly = TRUE)
 year <- args[1] # e.g. 2023
 
+### The output path ###
+
+output_path <- "final_data"
+
 ### Filtering criteria ###
 
 # Age
@@ -187,12 +191,6 @@ if ("losdays" %in% names(df_crani) && !"finaldischargedays" %in% names(df_crani)
 if ("cerebralmonitordays" %in% names(df_crani) && !"tbicerebralmonitordays" %in% names(df_crani)) {
   names(df_crani)[names(df_crani) == "cerebralmonitordays"] <- "tbicerebralmonitordays"
 }
-if ("cerebralmonitormins" %in% names(df_crani) && !"tbicerebralmonitorhrs" %in% names(df_crani)) {
-  names(df_crani)[names(df_crani) == "cerebralmonitormins"] <- "tbicerebralmonitorhrs"
-}
-if ("proceduremins" %in% names(df_crani) && !"hospitalprocedurestarthrs" %in% names(df_crani)) {
-  names(df_crani)[names(df_crani) == "proceduremins"] <- "hospitalprocedurestarthrs"
-}
 if ("proceduredays" %in% names(df_crani) && !"hospitalprocedurestartdays" %in% names(df_crani)) {
   names(df_crani)[names(df_crani) == "proceduredays"] <- "hospitalprocedurestartdays"
 }
@@ -222,9 +220,7 @@ df_crani <- df_crani %>%
     withdrawallstdays,
     statedesignation,
     tbicerebralmonitordays,
-    tbicerebralmonitorhrs,
     tbimidlineshift,
-    hospitalprocedurestarthrs,
     hospitalprocedurestartdays
   )
 
@@ -306,90 +302,16 @@ if ("teachingstatus" %in% names(isolated_tbi)) {
 #for 2021 after teaching status (academic is 1, others are 0)
 isolated_tbi$teachingstatus <- ifelse(isolated_tbi$teachingstatus == 1, 1, 0)
 
+isolated_tbi$year <- year
 
-#write_csv(isolated_tbi, "/Users/hunter/Downloads/Carilion/current attempt/2018cleaned.csv")
-#write_csv(isolated_tbi, "/Users/hunter/Downloads/Carilion/current attempt/2019cleaned.csv")
-#write_csv(isolated_tbi, "/Users/hunter/Downloads/Carilion/current attempt/2020cleaned.csv")
-#write_csv(isolated_tbi, "/Users/hunter/Downloads/Carilion/current attempt/2021cleaned.csv")
-#write_csv(isolated_tbi, "/Users/hunter/Downloads/Carilion/current attempt/2022cleaned.csv")
-#write_csv(isolated_tbi, "/Users/hunter/Downloads/Carilion/current attempt/2023cleaned.csv")
+if (!dir.exists(output_path)) {
+  dir.create(output_path, recursive = TRUE)
+}
 
+paste(output_path, "/", year, "cleaned.csv", sep="")
 
-setwd("/Users/hunter/Downloads/Carilion/current attempt")
-cleaned2018 <- read.csv("2018cleaned.csv")
-cleaned2019 <- read.csv("2019cleaned.csv")
-cleaned2020 <- read.csv("2020cleaned.csv")
-cleaned2021 <- read.csv("2021cleaned.csv")
-cleaned2022 <- read.csv("2022cleaned.csv")
-cleaned2023 <- read.csv("2023cleaned.csv")
-
-#head(cleaned2018)
-#head(cleaned2019)
-
-names(cleaned2018)[names(cleaned2018) == "losdays"] <- "finaldischargedays"
-names(cleaned2018)[names(cleaned2018) == "iss_05"] <- "iss"
-names(cleaned2019)[names(cleaned2019) == "iss_05"] <- "iss"
-names(cleaned2020)[names(cleaned2020) == "iss_05"] <- "iss"
-
-#add year column
-cleaned2018$year <- 2018
-cleaned2019$year <- 2019
-cleaned2020$year <- 2020
-cleaned2021$year <- 2021
-cleaned2022$year <- 2022
-cleaned2023$year <- 2023
-
-lapply(list(cleaned2018, cleaned2019, cleaned2020, cleaned2021, cleaned2022, cleaned2023), names)
-df_all <- bind_rows(
-  cleaned2018,
-  cleaned2019,
-  cleaned2020,
-  cleaned2021,
-  cleaned2022,
-  cleaned2023
-)
-glimpse(df_all)
-write_csv(df_all, "/Users/hunter/Downloads/Carilion/current attempt/merged years.csv")
-
-#what is the avg age now? 
-mean_age <- df_all %>%
-  summarise(mean_age = mean(ageyears, na.rm = TRUE)) %>%
-  pull(mean_age)
-mean_age
-#EMSMins
-#EMSResponseMins
-#EMSSceneMins
-
-#WITHDRAWALLST
-#WithdrawalLSTMins
-#WithdrawalLSTDays
-
-#STATEDESIGNATION
-
-#ich match post filtration but preanalysis TBD
-#investigate skull fracture and balance covariates along with ich
-  #binary TCCSKULLFRACTURE
-
-#transfer to ltc = code 12
-#time to procedure?? cont
-
-#CerebralMonitorDays cont
-
-##########
-1=Discharged/Transferred to a short-term general hospital for inpatient care
-2=Discharged/Transferred to an Intermediate Care Facility (ICF)
-3=Discharged/Transferred to home under care of organized home health service
-4=Left against medical advice or discontinued care
-5=Deceased/Expired
-6=Discharged to home or self-care (routine discharge)
-7=Discharged/Transferred to Skilled Nursing Facility (SNF)
-8=Discharged/Transferred to hospice care
-10=Discharged/Transferred to court/law enforcement.
-11=Discharged/Transferred to inpatient rehab or designated unit
-12=Discharged/Transferred to Long Term Care Hospital (LTCH)
-13=Discharged/Transferred to a psychiatric hospital or psychiatric distinct part unit of a hospital
-14=Discharged/Transferred to another type of institution not defined elsewhere
+write_csv(isolated_tbi, paste(output_path, "/", year, "cleaned.csv", sep=""))
 
 
-#discharge disposition table 
-###pull the midline shift code should be in the loveplot
+
+
