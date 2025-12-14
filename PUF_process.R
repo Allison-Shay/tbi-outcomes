@@ -281,20 +281,6 @@ filter_log <- log_step(isolated_tbi, "Isolated blunt TBI: AIS head > 1 & AIS non
 # for older years, change teaching status 0 = nonteaching 1= university
 # --- Clean & convert teachingstatus for isolated_tbi only ---
 if ("teachingstatus" %in% names(isolated_tbi)) {
-  isolated_tbi$teachingstatus <- isolated_tbi$teachingstatus |>
-    tolower() |>
-    trimws() |>
-    recode(
-      "university" = "1",
-      "community" = "0",
-      "nonteaching" = "0"
-    )
-  isolated_tbi$teachingstatus <- as.integer(isolated_tbi$teachingstatus)
-}
-
-#for 2020, change teaching status 0 = nonteaching 1= university
-# --- Clean & convert teachingstatus for isolated_tbi only ---
-if ("teachingstatus" %in% names(isolated_tbi)) {
   ts <- isolated_tbi$teachingstatus |>
     as.character() |>
     tolower() |>
