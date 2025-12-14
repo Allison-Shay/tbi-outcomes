@@ -106,6 +106,7 @@ crani_inc_keys <- df_icdproc_crani %>%
 
 df_crani <- df %>%
   filter(inc_key %in% crani_inc_keys)
+filter_log <- log_step(df_crani, "Craniotomy ICD-10-PCS code", filter_log)
 
 # Merge df_crani (patient-level) with df_icdproc (procedure-level)
 df_crani <- df_crani %>%
@@ -232,13 +233,13 @@ df_crani <- df_crani %>%
 
 ### Make a trach and gastro column based on ICD procedure codes ###
 
-df_crani1 <- df_crani1 %>%
+df_crani <- df_crani %>%
   mutate(trach = ifelse(
     str_detect(icd_procedures, str_c(trach_codes, collapse = "|")),
     1, 0
   ))
 
-df_crani1 <- df_crani1 %>%
+df_crani <- df_crani %>%
   mutate(gastro = ifelse(
     str_detect(icd_procedures, str_c(gastro_codes, collapse = "|")),
     1, 0
@@ -263,16 +264,17 @@ ais_nonhead <- df_nonhead %>%
 ais_summary <- ais_head %>%
   full_join(ais_nonhead, by = "inc_key")
 
-df_crani1 <- df_crani1 %>%
+df_crani <- df_crani %>%
   left_join(ais_summary, by = "inc_key")
 
 ### Filter based on injury codes ###
 
 # Patients with isolated blunt TBI defined as patients with any Head-Abbreviated Injury Scale (AIS) and non-Head AIS score <3.
 
-isolated_tbi <- df_crani1 %>%
+isolated_tbi <- df_crani %>%
   mutate(ais_nonhead = ifelse(is.na(ais_nonhead), 0, ais_nonhead)) %>%
   filter(ais_head > 1 & ais_nonhead < 3)
+filter_log <- log_step(isolated_tbi, "Isolated blunt TBI: AIS head > 1 & AIS non-head < 3", filter_log)
 
 ### Make dataset consistent across years ###
 
@@ -313,9 +315,8 @@ if (!dir.exists(output_path)) {
   dir.create(output_path, recursive = TRUE)
 }
 
-paste(output_path, "/", year, "cleaned.csv", sep="")
-
 write_csv(isolated_tbi, paste(output_path, "/", year, "cleaned.csv", sep=""))
+write_csv(isolated_tbi, paste(filter_log, "/", year, "filtering_summary.csv", sep=""))
 
 
 
