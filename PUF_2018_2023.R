@@ -20,6 +20,19 @@ output_path <- "final_data"
 
 ### Filtering criteria ###
 
+# This will store number of encounters (note: not patients, because TQIP only stores encounter IDs) at each filtering step
+filter_log <- data.frame(
+  step = character(),
+  n = integer(),
+  stringsAsFactors = FALSE
+)
+log_step <- function(df, name, log_df) {
+  rbind(
+    log_df,
+    data.frame(step = name, n = nrow(df), stringsAsFactors = FALSE)
+  )
+}
+
 # Age
 min_ageyears <- 18
 # List of trach ICD codes
@@ -75,10 +88,12 @@ colnames(df) <- tolower(colnames(df))
 colnames(df_ais) <- tolower(colnames(df_ais))
 colnames(df_icdproc) <- tolower(colnames(df_icdproc))
 colnames(df_icddiag) <- tolower(colnames(df_icddiag))
+filter_log <- log_step(df, "Initial cohort", filter_log)
 
 ### Filter the loaded data ###
 
 df <- df %>% filter(ageyears >= min_ageyears)
+filter_log <- log_step(df, "Age ≥ 18", filter_log)
 
 # crani code pts only
 df_icdproc_crani <- df_icdproc %>%
