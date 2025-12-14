@@ -11,7 +11,8 @@ make_path <- function(x, y) {
 
 ### Year to analyze ###
 
-year <- 2023
+args <- commandArgs(trailingOnly = TRUE)
+year <- args[1] # e.g. 2023
 
 ### Filtering criteria ###
 
