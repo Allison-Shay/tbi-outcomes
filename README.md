@@ -27,8 +27,6 @@ Make sure your data files are in a directory named **TQIP 2007-2023**; for examp
 
 We'll process years 2018-2023 using the following:
 
-We'll run the followin
-
 <pre>Rscript PUF_process.R 2023
 Rscrnipt </pre>
 
