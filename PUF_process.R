@@ -254,11 +254,19 @@ df_nonhead <- df_ais %>% filter(!str_detect(aispredot, "^1"))
 # Max AIS per patient
 ais_head <- df_head %>%
   group_by(inc_key) %>%
-  summarise(ais_head = max(aisseverity, na.rm = TRUE))
+  summarise(
+    ais_head = if (all(is.na(aisseverity))) NA_real_
+               else max(aisseverity, na.rm = TRUE),
+    .groups = "drop"
+  )
 
 ais_nonhead <- df_nonhead %>%
   group_by(inc_key) %>%
-  summarise(ais_nonhead = max(aisseverity, na.rm = TRUE))
+  summarise(
+    ais_nonhead = if (all(is.na(aisseverity))) NA_real_
+               else max(aisseverity, na.rm = TRUE),
+    .groups = "drop"
+  )
 
 # Merge both into one summary
 ais_summary <- ais_head %>%
