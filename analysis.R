@@ -259,7 +259,8 @@ cat("Rows:", nrow(df), "\nColumns:", ncol(df), "\n")
 
 data <- read.csv("final_data_merged/cleaned.csv")
 
-data_analytic <- data %>%
+apply_analytic_filters <- function(data_frame) {
+  data_frame %>%
   filter(!is.na(minority))%>%
   filter(!is.na(sex), sex %in% c(1,2))%>%
   filter(!is.na(teachingstatus))%>%
@@ -271,6 +272,9 @@ data_analytic <- data %>%
   # filter(!is.na(hospdischargedisposition))%>%   # Don't exclude upfront (avoid selection bias)
   # filter(!is.na(withdrawallst))%>%              # Don't exclude upfront
   filter(!is.na(ich_category))
+}
+
+data_analytic <- apply_analytic_filters(data)
 
 
 data_analytic <- data_analytic %>%
