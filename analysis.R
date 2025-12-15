@@ -9,7 +9,7 @@ library(lmtest)
 
 ###### Read in the data ######
 
-df <- read.csv("merged years.csv")
+df <- read.csv("final_data_merged/cleaned.csv")
 
 df$minority <- factor(df$minority, levels=c(0,1), labels=c("White","Minority"))
 df$sex <- factor(df$sex, levels=c(1,2), labels=c("Male","Female"))
@@ -100,10 +100,10 @@ cat("Rows:", nrow(df), "\nColumns:", ncol(df), "\n")
 ##########
 
 
-cont_vars <- c("ageyears","totalgcs","ais_head","ais_nonhead",
+cont_vars <- c("ageyears","totalgcs",
                "iss","totalventdays","totaliculos","finaldischargedays",
                "tbicerebralmonitordays",
-               "hospitalprocedurestarthrs","hospitalprocedurestartdays")
+               "hospitalprocedurestartdays")
 
 cat_vars <- c("sex","minority","verificationlevel","teachingstatus",
               "trach","gastro","icpparench","icpevdrain",
@@ -112,50 +112,27 @@ cat_vars <- c("sex","minority","verificationlevel","teachingstatus",
 
 
 cont_results <- lapply(cont_vars, function(v) {
-  
   x_white    <- df %>% filter(minority == "White")    %>% pull(!!sym(v))
   x_minority <- df %>% filter(minority == "Minority") %>% pull(!!sym(v))
-  
   data.frame(
     Variable = v,
-    
     White_Mean = mean(x_white, na.rm = TRUE),
     White_SD   = sd(x_white, na.rm = TRUE),
-    
     Minority_Mean = mean(x_minority, na.rm = TRUE),
     Minority_SD   = sd(x_minority, na.rm = TRUE),
-    
     P_value = wilcox.test(x_white, x_minority, exact = FALSE)$p.value,
-    
     row.names = NULL
   )
 })
 
 cont_results <- bind_rows(cont_results)
-cont_results
 
-cont_results <- lapply(cont_vars, function(v) {
-  x_white    <- df %>% filter(minority == "White")    %>% pull(!!sym(v))
-  x_minority <- df %>% filter(minority == "Minority") %>% pull(!!sym(v))
-  
-  data.frame(
-    Variable = v,
-    White_Mean = mean(x_white, na.rm = TRUE),
-    White_SD   = sd(x_white, na.rm = TRUE),
-    Minority_Mean = mean(x_minority, na.rm = TRUE),
-    Minority_SD   = sd(x_minority, na.rm = TRUE),
-    P_value = wilcox.test(x_white, x_minority, exact = FALSE)$p.value,
-    row.names = NULL
-  )
-})
-
+print(cont_results)
 
 cat_results <- lapply(cat_vars, function(v) {
-  
   # Drop rows with NA in this variable or minority
   tab <- table(df[[v]][!is.na(df[[v]])], df$minority[!is.na(df[[v]])])
   chi <- suppressWarnings(chisq.test(tab))
-  
   data.frame(
     Variable = v,
     White_n = tab[, "White"],
@@ -188,18 +165,15 @@ baseline_table
 ##################
 #Delaney
 
-data <- read.csv("merged years.csv", stringsAsFactors=F)
+data <- read.csv("final_data_merged/cleaned.csv", stringsAsFactors=F)
 
 data_analytic <- data %>%
-  filter(ageyears >= 18) %>%
-  filter(ais_head >= 2) %>%
   filter(!is.na(minority))%>%
   filter(!is.na(sex))%>%
   filter(!is.na(teachingstatus))%>%
   filter(!is.na(verificationlevel))%>%
   filter(!is.na(totalgcs))%>%
   filter(!is.na(iss))%>%
-  filter(!is.na(ais_nonhead))%>%
   filter(!is.na(tbimidlineshift))%>%
   filter(!is.na(statedesignation))
 
