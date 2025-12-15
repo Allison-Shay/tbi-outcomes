@@ -39,3 +39,7 @@ The output will be stored in a directory named **final_data**
 
 ## 3. Merge the data
 
+<pre>Rscript PUF_merge.R</pre>
+
+The output will be stored in a directory named **final_data_merged**
+
