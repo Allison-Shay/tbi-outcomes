@@ -165,17 +165,113 @@ baseline_table
 ##################
 #Delaney
 
-data <- read.csv("final_data_merged/cleaned.csv", stringsAsFactors=F)
+
+
+
+###### Read in the data ######
+
+df <- read.csv("final_data_merged/cleaned.csv")
+
+df$minority <- factor(df$minority, levels=c(0,1), labels=c("White","Minority"))
+df$sex <- factor(df$sex, levels=c(1,2), labels=c("Male","Female"))
+df$teachingstatus <- factor(df$teachingstatus)
+df$verificationlevel <- factor(df$verificationlevel)
+
+df$trach  <- factor(df$trach, levels=c(0,1), labels=c("No","Yes"))
+df$gastro <- factor(df$gastro, levels=c(0,1), labels=c("No","Yes"))
+
+df$icpparench <- factor(df$icpparench, levels=c(0,1), labels=c("No","Yes"))
+df$icpevdrain <- factor(df$icpevdrain, levels=c(0,1), labels=c("No","Yes"))
+
+df <- df %>%
+  mutate(
+    withdrawallst = factor(withdrawallst, levels = c(1,2), labels = c("Yes","No")),
+    tbimidlineshift = case_when(
+      is.na(tbimidlineshift) ~ NA_character_,
+      tbimidlineshift == 1 ~ "Yes",
+      tbimidlineshift == 2 ~ "No",
+      tbimidlineshift == 3 ~ NA_character_,
+      TRUE ~ NA_character_   # optional: make unexpected codes NA (or change to "Unknown")
+    ) %>% factor(levels = c("Yes","No")),
+    ich_category = factor(ich_category),
+    statedesignation = factor(statedesignation),
+    hospdischargedisposition = factor(hospdischargedisposition)
+  )
+
+
+
+###### Summarize the data ######
+
+max_levels_to_print <- 10  # threshold for printing categories
+
+summary_df <- data.frame(
+  column = character(),
+  type = character(),
+  na_count = integer(),
+  value_summary = character(),
+  stringsAsFactors = FALSE
+)
+
+for (col_name in names(df)) {
+  x <- df[[col_name]]
+  n_na <- sum(is.na(x))
+  x_no_na <- x[!is.na(x)]
+
+  # Numerical
+  if (is.numeric(x)) {
+    type <- "numerical"
+    if (length(x_no_na) == 0) {
+      value_summary <- "all values are NA"
+    } else {
+      value_summary <- paste0(
+        min(x_no_na), " to ", max(x_no_na)
+      )
+    }
+
+  # Categorical
+  } else {
+    type <- "categorical"
+    levels <- unique(x_no_na)
+    n_levels <- length(levels)
+
+    if (n_levels <= max_levels_to_print) {
+      value_summary <- paste(levels, collapse = ", ")
+    } else {
+      value_summary <- paste(n_levels, "categories")
+    }
+  }
+
+  summary_df <- rbind(
+    summary_df,
+    data.frame(
+      column = col_name,
+      type = type,
+      na_count = n_na,
+      value_summary = value_summary,
+      stringsAsFactors = FALSE
+    )
+  )
+}
+
+options(width = 300)
+print(summary_df[order(summary_df$type, decreasing=TRUE),], row.names = FALSE)
+cat("Rows:", nrow(df), "\nColumns:", ncol(df), "\n")
+
+data <- df
 
 data_analytic <- data %>%
   filter(!is.na(minority))%>%
-  filter(!is.na(sex))%>%
+  filter(!is.na(sex), sex %in% c(1, 2))%>%
   filter(!is.na(teachingstatus))%>%
   filter(!is.na(verificationlevel))%>%
   filter(!is.na(totalgcs))%>%
   filter(!is.na(iss))%>%
   filter(!is.na(tbimidlineshift))%>%
-  filter(!is.na(statedesignation))
+  filter(!is.na(statedesignation))%>%
+  filter(!is.na(hospdischargedisposition))%>%
+  filter(!is.na(withdrawallst))%>%
+  filter(!is.na(ich_category))
+
 
 data_analytic <- data_analytic %>%
   mutate(
@@ -183,7 +279,10 @@ data_analytic <- data_analytic %>%
     icpevdrain = ifelse(is.na(icpevdrain), 0, icpevdrain),
     trach      = ifelse(is.na(trach), 0, trach),
     gastro     = ifelse(is.na(gastro), 0, gastro),
-    neurosurg_any = ifelse(icpparench == 1 | icpevdrain == 1, 1, 0)
+    neurosurg_any = ifelse(icpparench == 1 | icpevdrain == 1, 1, 0),
+    mort_inhospital <- ifelse(matched$hospdischargedisposition == 5, 1, 0),
+    ltc_inhospital <- ifelse(matched$hospdischargedisposition == 12, 1, 0),
+    withdrawallst_bin = ifelse(withdrawallst == 1, 0, 1)
   )
 
 data_analytic <- data_analytic %>%
@@ -191,32 +290,14 @@ data_analytic <- data_analytic %>%
     sex              = factor(sex),                      # 0/1 or M/F -> factor
     minority         = as.integer(minority),             # 1 = minority, 0 = NHW
     verificationlevel = factor(verificationlevel),
-    teachingstatus   = factor(teachingstatus) #,
-    #year             = factor(year)
+    teachingstatus   = factor(teachingstatus)
   )
 
-data_ps <- data_ps %>%
-  mutate(
-    ais_nonhead = as.numeric(ais_nonhead)
-  )
-data_ps <- data_ps %>%
-  filter(!is.na(ais_nonhead),
-         is.finite(ais_nonhead))
-
-
-ps_formula <- minority ~ ageyears + sex + totalgcs + iss +
+ps_formula <- minority ~ ageyears + sex + iss +
   verificationlevel + teachingstatus +
-  ais_head + ais_nonhead +
   ich_category + statedesignation + tbimidlineshift
 
-#ps_formula <- minority ~ ageyears + sex + totalgcs + iss +
- # verificationlevel + teachingstatus + ais_head + ais_nonhead #+ year
 data_ps <- data_analytic %>%
-  filter(!is.na(totalgcs),
-         !is.na(verificationlevel),
-         !is.na(ich_category))  # <-- drop NA here)
-
-data_ps <- data_ps %>%
   mutate(
     gcs_cat = case_when(
       totalgcs <= 8  ~ "Severe",
@@ -267,6 +348,15 @@ trach_out <- run_logit_cluster(trach ~ minority, matched, matched$subclass)
 trach_out
 gastro_out <- run_logit_cluster(gastro ~ minority, matched, matched$subclass)
 gastro_out
+mort_out <- run_logit_cluster(mort_inhospital ~ minority, matched, matched$subclass)
+mort_out
+ltc_out <- run_logit_cluster(ltc_inhospital ~ minority, matched, matched$subclass)
+ltc_out
+wlt_out <- run_logit_cluster(withdrawallst_bin ~ minority, matched_wlt, matched_wlt$subclass)
+wlt_out
+
+
+
 
 table(matched$minority)
 
@@ -295,42 +385,14 @@ monitor_days_out
 
 
 
-# Create mortality indicator
-#logistic for binary
-matched$mort_inhospital <- ifelse(matched$hospdischargedisposition == 5, 1, 0)
-matched <- matched %>% filter(!is.na(subclass) & !is.na(mort_inhospital))
-# Then run your existing function
-mort_out <- run_logit_cluster(mort_inhospital ~ minority, matched, matched$subclass)
-mort_out
-
-
-# Create LTC indicator
-#logistic for binary
-matched$ltc_inhospital <- ifelse(matched$hospdischargedisposition == 12, 1, 0)
-matched <- matched %>% filter(!is.na(subclass) & !is.na(ltc_inhospital))
-# Then run your existing function
-ltc_out <- run_logit_cluster(ltc_inhospital ~ minority, matched, matched$subclass)
-ltc_out
-
-
-matched_wlt$withdrawallst_bin <- as.numeric(matched_wlt$withdrawallst_bin)
-matched_wlt <- matched %>% 
-  filter(!is.na(withdrawallst)) %>%
-  mutate(withdrawallst_bin = ifelse(withdrawallst == 1, 0, 1)) 
-# now 0 = no withdrawal, 1 = withdrawal
-
-wlt_out <- run_logit_cluster(withdrawallst_bin ~ minority, matched_wlt, matched_wlt$subclass)
-wlt_out
-
-
 # Midline shift
-matched_mid <- matched_mid %>%
-  mutate(tbimidlineshift_bin = ifelse(tbimidlineshift == 2, 1, 0))  # assuming 2 = shift, 1 = no shift
+#matched_mid <- matched_mid %>%
+#  mutate(tbimidlineshift_bin = ifelse(tbimidlineshift == 2, 1, 0))  # assuming 2 = shift, 1 = no shift
 
 # Then run logistic with clustered SE
-fit_mid <- glm(tbimidlineshift_bin ~ minority, data = matched_mid, family = binomial)
-vcov_cluster <- vcovCL(fit_mid, cluster = matched_mid$subclass)
-coeftest(fit_mid, vcov = vcov_cluster)
+#fit_mid <- glm(tbimidlineshift_bin ~ minority, data = matched_mid, family = binomial)
+#vcov_cluster <- vcovCL(fit_mid, cluster = matched_mid$subclass)
+#coeftest(fit_mid, vcov = vcov_cluster)
 
 
 
