@@ -6,6 +6,11 @@ library(readr)
 library(cobalt) # For post-match balance checks
 library(sandwich)
 library(lmtest)
+library(dplyr)
+library(purrr)
+library(tibble)
+library(estimatr)
+
 
 ###### Data filename #########
 
@@ -15,6 +20,8 @@ fname <- "final_data_merged/cleaned.csv"
 
 raw_df <- read.csv(fname)
 df <- raw_df
+
+###### Create a data summary table #######
 
 transform_analysis_vars <- function(df) {
 
@@ -73,9 +80,6 @@ transform_analysis_vars <- function(df) {
 df <- transform_analysis_vars(df)
 
 
-
-###### Summarize the data ######
-
 max_levels_to_print <- 10  # threshold for printing categories
 
 summary_df <- data.frame(
@@ -127,9 +131,13 @@ for (col_name in names(df)) {
   )
 }
 
+####### Print out the data summary table #######
+
 options(width = 300)
 print(summary_df[order(summary_df$type, decreasing=TRUE),], row.names = FALSE)
 cat("Rows:", nrow(df), "\nColumns:", ncol(df), "\n")
+
+####### Filter the data based on criteria of excluding missing/bad vaules ########
 
 data <- raw_df
 
@@ -151,7 +159,88 @@ apply_analytic_filters <- function(data_frame) {
 data_analytic <- apply_analytic_filters(data)
 data_analytic_mod <- transform_analysis_vars(data_analytic) # Simply change things from numerical to things like Yes/No Male/Female etc.
 
+######## Run statistical analysis to compare groups ########
 
+group_var <- "minority"
+
+exclude_vars <- character(0)
+
+# ---- Variable lists from summary_df ----
+num_vars <- summary_df %>%
+  filter(type == "numerical") %>%
+  pull(column) %>%
+  setdiff(c("inc_key")) %>%
+  setdiff(exclude_vars)
+
+cat_vars <- summary_df %>%
+  filter(type == "categorical") %>%
+  pull(column) %>%
+  setdiff(c(group_var)) %>%
+  setdiff(exclude_vars)
+
+# ---- Test helpers ----
+test_numeric_wilcox <- function(df, var, group) {
+  x <- df[[var]]
+  g <- df[[group]]
+  ok <- !is.na(x) & !is.na(g)
+  x <- x[ok]
+  g <- g[ok]
+  if (length(unique(g)) != 2) return(NA_real_)
+  tryCatch(wilcox.test(x ~ g)$p.value, error = function(e) NA_real_)
+}
+
+test_categorical_chisq <- function(df, var, group) {
+  x <- df[[var]]
+  g <- df[[group]]
+  ok <- !is.na(x) & !is.na(g)
+  x <- x[ok]
+  g <- g[ok]
+  if (length(unique(g)) != 2) return(NA_real_)
+  tbl <- table(x, g)
+  if (any(dim(tbl) < 2)) return(NA_real_)
+  tryCatch(chisq.test(tbl)$p.value, error = function(e) NA_real_)
+}
+
+# ---- Run tests ----
+results_num <- map_dfr(num_vars, function(v) {
+  tibble(
+    variable = v,
+    type = "continuous",
+    n_nonmissing = sum(!is.na(data_analytic_mod[[v]]) & !is.na(data_analytic_mod[[group_var]])),
+    p_value = test_numeric_wilcox(data_analytic_mod, v, group_var)
+  )
+})
+
+results_cat <- map_dfr(cat_vars, function(v) {
+  # also record table size so you can spot "ICD-like" variables if you didn't exclude them
+  x <- data_analytic_mod[[v]]
+  g <- data_analytic_mod[[group_var]]
+  ok <- !is.na(x) & !is.na(g)
+  tbl <- table(x[ok], g[ok])
+  tibble(
+    variable = v,
+    type = "categorical",
+    n_nonmissing = sum(ok),
+    n_levels = nrow(tbl),
+    table_cells = prod(dim(tbl)),
+    p_value = test_categorical_chisq(data_analytic_mod, v, group_var)
+  )
+})
+
+table1_pvals <- bind_rows(results_num, results_cat) %>%
+  mutate(
+    p_value = ifelse(is.na(p_value), NA, signif(p_value, 3)),
+    note = case_when(
+      type == "categorical" & !is.na(table_cells) & table_cells > 20000 ~ "very large contingency table",
+      TRUE ~ ""
+    )
+  ) %>%
+  arrange(type, p_value)
+
+print(table1_pvals, n = Inf)
+
+
+######## Make some new data variables and factorize some existing ones ########
 
 
 data_analytic <- data_analytic %>%
@@ -190,6 +279,9 @@ data_analytic <- data_analytic %>%
     )
 )
 
+######## Propensity matching ########
+
+
 ps_formula <- minority ~ ageyears + sex + iss +
   verificationlevel + teachingstatus +
   ich_category + statedesignation + tbimidlineshift
@@ -211,9 +303,14 @@ m.out <- matchit(
   exact = ~ gcs_cat     # <-- THIS IS NEEDED TO PROPENSITY MATCH GCS
 )
 
-summary(m.out)
 
+######## Results of propensity matching ########
+
+summary(m.out)
 love.plot(m.out)
+
+
+####### Regression analyses #########
 
 # Helper function: clustered-robust SE by subclass
 cluster_se <- function(model, cluster) {
@@ -278,14 +375,6 @@ wlt_out <- run_logit_cluster(
   matched_wlt$subclass
 )
 wlt_out
-
-
-
-table(matched$minority)
-
-
-###########
-library(estimatr)
 
 
 # Linear regression with clustered SE
