@@ -7,35 +7,70 @@ library(cobalt) # For post-match balance checks
 library(sandwich)
 library(lmtest)
 
+###### Data filename #########
+
+fname <- "final_data_merged/cleaned.csv"
+
 ###### Read in the data ######
 
-df <- read.csv("final_data_merged/cleaned.csv")
+raw_df <- read.csv(fname)
+df <- raw_df
 
-df$minority <- factor(df$minority, levels=c(0,1), labels=c("White","Minority"))
-df$sex <- factor(df$sex, levels=c(1,2), labels=c("Male","Female"))
-df$teachingstatus <- factor(df$teachingstatus)
-df$verificationlevel <- factor(df$verificationlevel)
+transform_analysis_vars <- function(df) {
 
-df$trach  <- factor(df$trach, levels=c(0,1), labels=c("No","Yes"))
-df$gastro <- factor(df$gastro, levels=c(0,1), labels=c("No","Yes"))
-
-df$icpparench <- factor(df$icpparench, levels=c(0,1), labels=c("No","Yes"))
-df$icpevdrain <- factor(df$icpevdrain, levels=c(0,1), labels=c("No","Yes"))
-
-df <- df %>%
-  mutate(
-    withdrawallst = factor(withdrawallst, levels = c(1,2), labels = c("Yes","No")),
-    tbimidlineshift = case_when(
-      is.na(tbimidlineshift) ~ NA_character_,
-      tbimidlineshift == 1 ~ "Yes",
-      tbimidlineshift == 2 ~ "No",
-      tbimidlineshift == 3 ~ NA_character_,
-      TRUE ~ NA_character_   # optional: make unexpected codes NA (or change to "Unknown")
-    ) %>% factor(levels = c("Yes","No")),
-    ich_category = factor(ich_category),
-    statedesignation = factor(statedesignation),
-    hospdischargedisposition = factor(hospdischargedisposition)
+  # Optional safety check (highly recommended)
+  required_cols <- c(
+    "minority", "sex", "teachingstatus", "verificationlevel",
+    "trach", "gastro", "icpparench", "icpevdrain",
+    "withdrawallst", "tbimidlineshift", "ich_category",
+    "statedesignation", "hospdischargedisposition"
   )
+
+  missing_cols <- setdiff(required_cols, names(df))
+  if (length(missing_cols) > 0) {
+    stop(
+      paste("Missing required columns:", paste(missing_cols, collapse = ", ")),
+      call. = FALSE
+    )
+  }
+
+  df %>%
+    mutate(
+      # Core demographics
+      minority = factor(minority, levels = c(0, 1),
+                        labels = c("White", "Minority")),
+      sex = factor(sex, levels = c(1, 2),
+                   labels = c("Male", "Female")),
+
+      # Hospital characteristics
+      teachingstatus = factor(teachingstatus),
+      verificationlevel = factor(verificationlevel),
+
+      # Procedures
+      trach  = factor(trach, levels = c(0, 1), labels = c("No", "Yes")),
+      gastro = factor(gastro, levels = c(0, 1), labels = c("No", "Yes")),
+      icpparench = factor(icpparench, levels = c(0, 1), labels = c("No", "Yes")),
+      icpevdrain = factor(icpevdrain, levels = c(0, 1), labels = c("No", "Yes")),
+
+      # Outcomes / clinical decisions
+      withdrawallst = factor(withdrawallst,
+                             levels = c(1, 2),
+                             labels = c("Yes", "No")),
+
+      # Injury characteristics
+      tbimidlineshift = case_when(
+        tbimidlineshift == 1 ~ "Yes",
+        tbimidlineshift == 2 ~ "No",
+        TRUE ~ NA_character_
+      ) %>% factor(levels = c("Yes", "No")),
+
+      ich_category = factor(ich_category),
+      statedesignation = factor(statedesignation),
+      hospdischargedisposition = factor(hospdischargedisposition)
+    )
+}
+
+df <- transform_analysis_vars(df)
 
 
 
@@ -96,168 +131,7 @@ options(width = 300)
 print(summary_df[order(summary_df$type, decreasing=TRUE),], row.names = FALSE)
 cat("Rows:", nrow(df), "\nColumns:", ncol(df), "\n")
 
-
-##########
-
-
-cont_vars <- c("ageyears","totalgcs",
-               "iss","totalventdays","totaliculos","finaldischargedays",
-               "tbicerebralmonitordays",
-               "hospitalprocedurestartdays")
-
-cat_vars <- c("sex","minority","verificationlevel","teachingstatus",
-              "trach","gastro","icpparench","icpevdrain",
-              "hospdischargedisposition","ich_category",
-              "withdrawallst","withdrawallstdays","statedesignation", "tbimidlineshift")
-
-
-cont_results <- lapply(cont_vars, function(v) {
-  x_white    <- df %>% filter(minority == "White")    %>% pull(!!sym(v))
-  x_minority <- df %>% filter(minority == "Minority") %>% pull(!!sym(v))
-  data.frame(
-    Variable = v,
-    White_Mean = mean(x_white, na.rm = TRUE),
-    White_SD   = sd(x_white, na.rm = TRUE),
-    Minority_Mean = mean(x_minority, na.rm = TRUE),
-    Minority_SD   = sd(x_minority, na.rm = TRUE),
-    P_value = wilcox.test(x_white, x_minority, exact = FALSE)$p.value,
-    row.names = NULL
-  )
-})
-
-cont_results <- bind_rows(cont_results)
-
-print(cont_results)
-
-cat_results <- lapply(cat_vars, function(v) {
-  # Drop rows with NA in this variable or minority
-  tab <- table(df[[v]][!is.na(df[[v]])], df$minority[!is.na(df[[v]])])
-  chi <- suppressWarnings(chisq.test(tab))
-  data.frame(
-    Variable = v,
-    White_n = tab[, "White"],
-    White_pct = round(prop.table(tab, 2)[, "White"] * 100, 1),
-    Minority_n = tab[, "Minority"],
-    Minority_pct = round(prop.table(tab, 2)[, "Minority"] * 100, 1),
-    P_value = chi$p.value,
-    row.names = NULL
-  )
-})
-
-# Combine the continuous results into a single data frame
-cont_results_df <- bind_rows(cont_results) %>% 
-  mutate(Type = "Continuous")
-
-# Combine the categorical results into a single data frame
-cat_results_df <- bind_rows(cat_results) %>% 
-  mutate(Type = "Categorical")
-
-# Combine both
-final_table <- bind_rows(cont_results_df, cat_results_df)
-final_table
-
-# Build full table 
-cat_table <- bind_rows(lapply(cat_vars, cat_summary))
-cont_table <- bind_rows(lapply(cont_vars, cont_summary))
-baseline_table <- bind_rows(cat_table, cont_table)
-baseline_table
-
-##################
-#Delaney
-
-
-
-
-###### Read in the data ######
-
-df <- read.csv("final_data_merged/cleaned.csv")
-
-df$minority <- factor(df$minority, levels=c(0,1), labels=c("White","Minority"))
-df$sex <- factor(df$sex, levels=c(1,2), labels=c("Male","Female"))
-df$teachingstatus <- factor(df$teachingstatus)
-df$verificationlevel <- factor(df$verificationlevel)
-
-df$trach  <- factor(df$trach, levels=c(0,1), labels=c("No","Yes"))
-df$gastro <- factor(df$gastro, levels=c(0,1), labels=c("No","Yes"))
-
-df$icpparench <- factor(df$icpparench, levels=c(0,1), labels=c("No","Yes"))
-df$icpevdrain <- factor(df$icpevdrain, levels=c(0,1), labels=c("No","Yes"))
-
-df <- df %>%
-  mutate(
-    withdrawallst = factor(withdrawallst, levels = c(1,2), labels = c("Yes","No")),
-    tbimidlineshift = case_when(
-      is.na(tbimidlineshift) ~ NA_character_,
-      tbimidlineshift == 1 ~ "Yes",
-      tbimidlineshift == 2 ~ "No",
-      tbimidlineshift == 3 ~ NA_character_,
-      TRUE ~ NA_character_   # optional: make unexpected codes NA (or change to "Unknown")
-    ) %>% factor(levels = c("Yes","No")),
-    ich_category = factor(ich_category),
-    statedesignation = factor(statedesignation),
-    hospdischargedisposition = factor(hospdischargedisposition)
-  )
-
-
-
-###### Summarize the data ######
-
-max_levels_to_print <- 10  # threshold for printing categories
-
-summary_df <- data.frame(
-  column = character(),
-  type = character(),
-  na_count = integer(),
-  value_summary = character(),
-  stringsAsFactors = FALSE
-)
-
-for (col_name in names(df)) {
-  x <- df[[col_name]]
-  n_na <- sum(is.na(x))
-  x_no_na <- x[!is.na(x)]
-
-  # Numerical
-  if (is.numeric(x)) {
-    type <- "numerical"
-    if (length(x_no_na) == 0) {
-      value_summary <- "all values are NA"
-    } else {
-      value_summary <- paste0(
-        min(x_no_na), " to ", max(x_no_na)
-      )
-    }
-
-  # Categorical
-  } else {
-    type <- "categorical"
-    levels <- unique(x_no_na)
-    n_levels <- length(levels)
-
-    if (n_levels <= max_levels_to_print) {
-      value_summary <- paste(levels, collapse = ", ")
-    } else {
-      value_summary <- paste(n_levels, "categories")
-    }
-  }
-
-  summary_df <- rbind(
-    summary_df,
-    data.frame(
-      column = col_name,
-      type = type,
-      na_count = n_na,
-      value_summary = value_summary,
-      stringsAsFactors = FALSE
-    )
-  )
-}
-
-options(width = 300)
-print(summary_df[order(summary_df$type, decreasing=TRUE),], row.names = FALSE)
-cat("Rows:", nrow(df), "\nColumns:", ncol(df), "\n")
-
-data <- read.csv("final_data_merged/cleaned.csv")
+data <- raw_df
 
 apply_analytic_filters <- function(data_frame) {
   data_frame %>%
@@ -275,6 +149,9 @@ apply_analytic_filters <- function(data_frame) {
 }
 
 data_analytic <- apply_analytic_filters(data)
+data_analytic_mod <- transform_analysis_vars(data_analytic) # Simply change things from numerical to things like Yes/No Male/Female etc.
+
+
 
 
 data_analytic <- data_analytic %>%
