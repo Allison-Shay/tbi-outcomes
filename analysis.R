@@ -15,7 +15,7 @@ library(estimatr)
 ###### File paths #########
 
 fname <- "final_data_merged/cleaned.csv"
-output_dir <- "output"
+output_dir <- "analysis"
 
 if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE)
