@@ -90,72 +90,6 @@ colnames(df_icdproc) <- tolower(colnames(df_icdproc))
 colnames(df_icddiag) <- tolower(colnames(df_icddiag))
 filter_log <- log_step(df, "Initial cohort", filter_log)
 
-### Optional: Load and output the ICD code descriptions (this is done by supplying ICD on the command-line) ###
-
-# ---- Optional ICD lookup export ----
-if (length(args) >= 2 && !is.na(args[2]) && args[2] == "ICD") {
-
-  # Read lookup tables, skipping the first line (header) and keeping only first 2 columns
-  proc_lookup <- read.csv(
-    make_path(year, "PUF_ICDPROCEDURE_LOOKUP.csv"),
-    skip = 1,
-    header = FALSE,
-    stringsAsFactors = FALSE
-  )
-  diag_lookup <- read.csv(
-    make_path(year, "PUF_ICDDIAGNOSIS_LOOKUP.csv"),
-    skip = 1,
-    header = FALSE,
-    stringsAsFactors = FALSE
-  )
-
-  proc_lookup <- proc_lookup[, 1:2, drop = FALSE]
-  diag_lookup <- diag_lookup[, 1:2, drop = FALSE]
-
-  # Normalize code column for matching (lookup codes might contain whitespace)
-  proc_lookup[[1]] <- trimws(as.character(proc_lookup[[1]]))
-  diag_lookup[[1]] <- trimws(as.character(diag_lookup[[1]]))
-
-  # Find matches (your lists are procedure codes)
-  crani_rows  <- proc_lookup[proc_lookup[[1]] %in% crani_codes, , drop = FALSE]
-  gastro_rows <- proc_lookup[proc_lookup[[1]] %in% gastro_codes, , drop = FALSE]
-  trach_rows  <- proc_lookup[proc_lookup[[1]] %in% trach_codes, , drop = FALSE]
-
-  # Helper: write a section header + rows
-  out_file <- paste(output_path, "/", "ICD_codes.csv", sep = "")
-  if (!dir.exists(output_path)) dir.create(output_path, recursive = TRUE)
-
-  con <- file(out_file, open = "wt")
-
-  write_section <- function(con, title, df2) {
-    # Section header row (single-cell row)
-    writeLines(title, con)
-    # Column header for this section
-    writeLines("code,description", con)
-    # Data rows (first two columns only)
-    if (nrow(df2) > 0) {
-      write.table(
-        df2,
-        file = con,
-        sep = ",",
-        row.names = FALSE,
-        col.names = FALSE,
-        quote = TRUE
-      )
-    }
-    # blank line between sections
-    writeLines("", con)
-  }
-
-  write_section(con, "Craniotomy codes", crani_rows)
-  write_section(con, "Gastrostomy codes", gastro_rows)
-  write_section(con, "Tracheostomy codes", trach_rows)
-
-  close(con)
-
-  message("Wrote ICD lookup matches to: ", out_file)
-}
-
 
 ### Filter the loaded data ###
 
@@ -267,6 +201,75 @@ if ("cerebralmonitordays" %in% names(df_crani) && !"tbicerebralmonitordays" %in%
 if ("proceduredays" %in% names(df_crani) && !"hospitalprocedurestartdays" %in% names(df_crani)) {
   names(df_crani)[names(df_crani) == "proceduredays"] <- "hospitalprocedurestartdays"
 }
+
+### Optional: Load and output the ICD code descriptions (this is done by supplying ICD on the command-line) ###
+
+# ---- Optional ICD lookup export ----
+if (length(args) >= 2 && args[2] == "ICD") {
+
+  # Read lookup tables (skip header, keep first 2 columns only)
+  proc_lookup <- read.csv(
+    make_path(year, "PUF_ICDPROCEDURE_LOOKUP.csv"),
+    skip = 1,
+    header = FALSE,
+    stringsAsFactors = FALSE
+  )[, 1:2]
+
+  diag_lookup <- read.csv(
+    make_path(year, "PUF_ICDDIAGNOSIS_LOOKUP.csv"),
+    skip = 1,
+    header = FALSE,
+    stringsAsFactors = FALSE
+  )[, 1:2]
+
+  colnames(proc_lookup) <- colnames(diag_lookup) <- c("code", "description")
+
+  proc_lookup$code <- trimws(proc_lookup$code)
+  diag_lookup$code <- trimws(diag_lookup$code)
+
+  # ---- Procedure sections ----
+  crani_rows  <- proc_lookup[proc_lookup$code %in% crani_codes, ]
+  gastro_rows <- proc_lookup[proc_lookup$code %in% gastro_codes, ]
+  trach_rows  <- proc_lookup[proc_lookup$code %in% trach_codes, ]
+
+  # ---- ICH diagnosis sections (ACTUAL ICD CODES) ----
+  ich_edh <- diag_lookup[str_detect(diag_lookup$code, "^S06\\.4"), ]
+  ich_sdh <- diag_lookup[str_detect(diag_lookup$code, "^S06\\.5"), ]
+  ich_sah <- diag_lookup[str_detect(diag_lookup$code, "^S06\\.6"), ]
+  ich_iph <- diag_lookup[str_detect(diag_lookup$code, "^S06\\.3"), ]
+  ich_other <- diag_lookup[str_detect(diag_lookup$code, "^S06\\.89|^S06\\.9"), ]
+
+  out_file <- paste(output_path, "/", "ICD_codes.csv", sep = "")
+  if (!dir.exists(output_path)) dir.create(output_path, recursive = TRUE)
+
+  con <- file(out_file, open = "wt")
+
+  write_section <- function(title, df) {
+    writeLines(title, con)
+    writeLines("code,description", con)
+    if (nrow(df) > 0) {
+      write.table(df, con, sep = ",", row.names = FALSE,
+                  col.names = FALSE, quote = TRUE)
+    }
+    writeLines("", con)
+  }
+
+  write_section("Craniotomy procedure codes", crani_rows)
+  write_section("Gastrostomy procedure codes", gastro_rows)
+  write_section("Tracheostomy procedure codes", trach_rows)
+
+  write_section("ICH type: epidural hematoma", ich_edh)
+  write_section("ICH type: subdural hematoma", ich_sdh)
+  write_section("ICH type: subarachnoid hemorrhage", ich_sah)
+  write_section("ICH type: intraparenchymal hemorrhage", ich_iph)
+  write_section("ICH type: other", ich_other)
+
+  close(con)
+
+  message("Wrote ICD codes to: ", out_file)
+}
+
+
 
 ### Finally, subset our data frame to only contain our columns of interest ###
 
