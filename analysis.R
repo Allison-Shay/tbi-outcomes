@@ -155,6 +155,12 @@ log_step <- function(df, name, log_df) {
     data.frame(step = name, n = nrow(df), stringsAsFactors = FALSE)
   )
 }
+log_step_n <- function(num, name, log_df) {
+  rbind(
+    log_df,
+    data.frame(step = name, n = num, stringsAsFactors = FALSE)
+  )
+}
 filter_log <- log_step(raw_df, "Raw", filter_log)
 
 
@@ -179,7 +185,6 @@ data_analytic <- apply_analytic_filters(data)
 data_analytic_mod <- transform_analysis_vars(data_analytic) # Simply change things from numerical to things like Yes/No Male/Female etc.
 
 filter_log <- log_step(data_analytic, "Filtered (removed missing/bad values)", filter_log)
-write_csv(filter_log, paste(output_dir, "/", "filtering_summary.csv", sep=""))
 
 ######## Run statistical analysis to compare groups ########
 
@@ -260,6 +265,217 @@ table1_pvals <- bind_rows(results_num, results_cat) %>%
   arrange(type, p_value)
 
 write.csv(table1_pvals, file.path(output_dir, "raw_data_statistics.csv"), row.names=FALSE)
+
+
+######## Run more detailed statistical analyses ############
+
+group_var <- "minority"
+exclude_vars <- character(0)
+
+# ---- settings ----
+max_cat_levels_to_print <- 30   # cap printed levels per categorical var (prevents 50k ICD rows)
+show_other_bucket <- TRUE       # if TRUE, collapses remaining levels into "Other"
+digits_cont <- 2
+
+fmt_p <- function(p) {
+  if (is.na(p)) return(NA_character_)
+  if (p < 0.001) "<0.001" else sprintf("%.3f", p)
+}
+
+fmt_num <- function(x, digits = 2) sprintf(paste0("%.", digits, "f"), x)
+
+# ---- variable lists from summary_df ----
+num_vars <- summary_df %>%
+  filter(type == "numerical") %>%
+  pull(column) %>%
+  setdiff(c("inc_key")) %>%
+  setdiff(exclude_vars)
+
+cat_vars <- summary_df %>%
+  filter(type == "categorical") %>%
+  pull(column) %>%
+  setdiff(c(group_var)) %>%
+  setdiff(exclude_vars)
+
+# ---- tests ----
+test_numeric_wilcox <- function(df, var, group) {
+  x <- df[[var]]
+  g <- df[[group]]
+  ok <- !is.na(x) & !is.na(g)
+  x <- x[ok]
+  g <- g[ok]
+  if (length(unique(g)) != 2) return(NA_real_)
+  tryCatch(wilcox.test(x ~ g)$p.value, error = function(e) NA_real_)
+}
+
+test_categorical_chisq <- function(df, var, group) {
+  x <- df[[var]]
+  g <- df[[group]]
+  ok <- !is.na(x) & !is.na(g)
+  x <- x[ok]
+  g <- g[ok]
+  if (length(unique(g)) != 2) return(NA_real_)
+  tbl <- table(x, g)
+  if (any(dim(tbl) < 2)) return(NA_real_)
+  tryCatch(chisq.test(tbl)$p.value, error = function(e) NA_real_)
+}
+
+# ---- group labels and sizes ----
+g_all <- data_analytic_mod[[group_var]]
+g_levels <- sort(unique(na.omit(g_all)))
+if (length(g_levels) != 2) stop("group_var must have exactly 2 non-NA levels", call. = FALSE)
+
+g1 <- g_levels[1]
+g2 <- g_levels[2]
+
+N_total <- nrow(data_analytic_mod)
+N_g1 <- sum(g_all == g1, na.rm = TRUE)
+N_g2 <- sum(g_all == g2, na.rm = TRUE)
+
+# ---- header rows (overall + group counts) ----
+header_rows <- tibble(
+  variable = c("N (encounters)", paste0("N: ", group_var, " = ", g1), paste0("N: ", group_var, " = ", g2)),
+  level = "",
+  overall = c(as.character(N_total), "", ""),
+  group1 = c("", as.character(N_g1), ""),
+  group2 = c("", "", as.character(N_g2)),
+  p_value = "",
+  missing = "",
+  type = "header",
+  note = ""
+)
+
+# ---- continuous summaries ----
+summarise_continuous <- function(df, var, group, g1, g2) {
+  x <- df[[var]]
+  g <- df[[group]]
+
+  overall_nmiss <- sum(is.na(x) | is.na(g))
+  # (missing for this row = missing x OR missing group assignment)
+  # If you prefer only missing x, change to sum(is.na(x))
+
+  x_all <- x[!is.na(x) & !is.na(g)]
+  x_g1 <- x[g == g1 & !is.na(x)]
+  x_g2 <- x[g == g2 & !is.na(x)]
+
+  p <- test_numeric_wilcox(df, var, group)
+
+  tibble(
+    variable = var,
+    level = "",
+    overall = if (length(x_all) == 0) NA_character_ else paste0(
+      fmt_num(mean(x_all), digits_cont), " (", fmt_num(sd(x_all), digits_cont), "); ",
+      "median ", fmt_num(median(x_all), digits_cont), " [", fmt_num(IQR(x_all), digits_cont), "]; ",
+      "range ", fmt_num(min(x_all), digits_cont), "–", fmt_num(max(x_all), digits_cont)
+    ),
+    group1 = if (length(x_g1) == 0) NA_character_ else paste0(
+      fmt_num(mean(x_g1), digits_cont), " (", fmt_num(sd(x_g1), digits_cont), "); ",
+      "median ", fmt_num(median(x_g1), digits_cont), " [", fmt_num(IQR(x_g1), digits_cont), "]; ",
+      "range ", fmt_num(min(x_g1), digits_cont), "–", fmt_num(max(x_g1), digits_cont)
+    ),
+    group2 = if (length(x_g2) == 0) NA_character_ else paste0(
+      fmt_num(mean(x_g2), digits_cont), " (", fmt_num(sd(x_g2), digits_cont), "); ",
+      "median ", fmt_num(median(x_g2), digits_cont), " [", fmt_num(IQR(x_g2), digits_cont), "]; ",
+      "range ", fmt_num(min(x_g2), digits_cont), "–", fmt_num(max(x_g2), digits_cont)
+    ),
+    p_value = fmt_p(p),
+    missing = as.character(sum(is.na(x))),
+    type = "continuous",
+    note = ""
+  )
+}
+
+cont_rows <- map_dfr(num_vars, ~ summarise_continuous(data_analytic_mod, .x, group_var, g1, g2))
+
+# ---- categorical summaries ----
+# helper to optionally collapse to top levels
+collapse_levels <- function(x, max_levels, show_other) {
+  x <- as.character(x)
+  x[is.na(x)] <- NA_character_
+  tab <- sort(table(x, useNA = "no"), decreasing = TRUE)
+  levs <- names(tab)
+
+  if (length(levs) <= max_levels) return(factor(x, levels = levs))
+
+  keep <- levs[seq_len(max_levels)]
+  if (show_other) {
+    x2 <- ifelse(x %in% keep, x, "Other")
+    factor(x2, levels = c(keep, "Other"))
+  } else {
+    x2 <- ifelse(x %in% keep, x, NA_character_)
+    factor(x2, levels = keep)
+  }
+}
+
+summarise_categorical <- function(df, var, group, g1, g2, max_levels, show_other) {
+  x_raw <- df[[var]]
+  g <- df[[group]]
+
+  # Collapse to top levels for display (prevents gigantic tables)
+  x <- collapse_levels(x_raw, max_levels, show_other)
+
+  p <- test_categorical_chisq(
+    df %>% mutate(!!var := x),
+    var,
+    group
+  )
+
+  # For n (%) by group, denominator is non-missing group within that group
+  denom_g1 <- sum(g == g1, na.rm = TRUE)
+  denom_g2 <- sum(g == g2, na.rm = TRUE)
+
+  # Overall denominator = all rows (or non-missing group) – choose what you prefer
+  denom_all <- sum(!is.na(g))
+
+  levels_x <- levels(x)
+  out <- map_dfr(levels_x, function(lv) {
+    n_all <- sum(x == lv, na.rm = TRUE)
+    n1 <- sum(x == lv & g == g1, na.rm = TRUE)
+    n2 <- sum(x == lv & g == g2, na.rm = TRUE)
+
+    tibble(
+      variable = var,
+      level = lv,
+      overall = paste0(n_all, " (", fmt_num(100 * n_all / denom_all, 1), "%)"),
+      group1 = paste0(n1, " (", fmt_num(100 * n1 / denom_g1, 1), "%)"),
+      group2 = paste0(n2, " (", fmt_num(100 * n2 / denom_g2, 1), "%)"),
+      p_value = "",  # put p-value only on the variable header row below
+      missing = "",
+      type = "categorical_level",
+      note = ""
+    )
+  })
+
+  # add a variable header row that carries the p-value + missingness
+  header <- tibble(
+    variable = var,
+    level = "",
+    overall = "",
+    group1 = "",
+    group2 = "",
+    p_value = fmt_p(p),
+    missing = as.character(sum(is.na(x_raw))),
+    type = "categorical",
+    note = if (length(unique(na.omit(x_raw))) > max_levels) {
+      paste0("shown top ", max_levels, if (show_other) " + Other" else "")
+    } else ""
+  )
+
+  bind_rows(header, out)
+}
+
+cat_rows <- map_dfr(cat_vars, ~ summarise_categorical(
+  data_analytic_mod, .x, group_var, g1, g2, max_cat_levels_to_print, show_other_bucket
+))
+
+# ---- final Table 1 ----
+table1 <- bind_rows(header_rows, cont_rows, cat_rows) %>%
+  rename(
+    !!paste0(group_var, "=", g1) := group1,
+    !!paste0(group_var, "=", g2) := group2
+  )
+
+write.csv(table1, file.path(output_dir, "raw_data_statistics_detailed.csv"), row.names=FALSE)
 
 
 ######## Make some new data variables and factorize some existing ones ########
@@ -368,7 +584,7 @@ run_logit_cluster <- function(formula, data, cluster) {
 }
 
 matched <- match.data(m.out)
-#crani_out<- run_logit_cluster(crani ~ minority, matched, matched$subclass)
+#crani_out <- run_logit_cluster(crani ~ minority, matched, matched$subclass)
 #crani_out
 parench_out <- run_logit_cluster(icpparench ~ minority, matched, matched$subclass)
 parench_out
@@ -546,8 +762,17 @@ results_table <- bind_rows(
 
 write.csv(results_table, file.path(output_dir, "final_analysis.csv"), row.names = FALSE)
 
+filter_log <- log_step_n(nrow(matched[matched$minority == 0,]), "White", filter_log)
+filter_log <- log_step_n(nrow(matched[matched$minority == 1,]), "Minority", filter_log)
+filter_log <- log_step_n(nrow(matched[matched$sex == 1,]), "(Male)", filter_log)
+filter_log <- log_step_n(nrow(matched[matched$sex == 2,]), "(Female)", filter_log)
+write_csv(filter_log, paste(output_dir, "/", "filtering_summary.csv", sep=""))
 
 
-              
+
+
+
+
+
 
 
