@@ -90,6 +90,73 @@ colnames(df_icdproc) <- tolower(colnames(df_icdproc))
 colnames(df_icddiag) <- tolower(colnames(df_icddiag))
 filter_log <- log_step(df, "Initial cohort", filter_log)
 
+### Optional: Load and output the ICD code descriptions (this is done by supplying ICD on the command-line) ###
+
+# ---- Optional ICD lookup export ----
+if (length(args) >= 2 && !is.na(args[2]) && args[2] == "ICD") {
+
+  # Read lookup tables, skipping the first line (header) and keeping only first 2 columns
+  proc_lookup <- read.csv(
+    make_path(year, "PUF_ICDPROCEDURE_LOOKUP.csv"),
+    skip = 1,
+    header = FALSE,
+    stringsAsFactors = FALSE
+  )
+  diag_lookup <- read.csv(
+    make_path(year, "PUF_ICDDIAGNOSIS_LOOKUP.csv"),
+    skip = 1,
+    header = FALSE,
+    stringsAsFactors = FALSE
+  )
+
+  proc_lookup <- proc_lookup[, 1:2, drop = FALSE]
+  diag_lookup <- diag_lookup[, 1:2, drop = FALSE]
+
+  # Normalize code column for matching (lookup codes might contain whitespace)
+  proc_lookup[[1]] <- trimws(as.character(proc_lookup[[1]]))
+  diag_lookup[[1]] <- trimws(as.character(diag_lookup[[1]]))
+
+  # Find matches (your lists are procedure codes)
+  crani_rows  <- proc_lookup[proc_lookup[[1]] %in% crani_codes, , drop = FALSE]
+  gastro_rows <- proc_lookup[proc_lookup[[1]] %in% gastro_codes, , drop = FALSE]
+  trach_rows  <- proc_lookup[proc_lookup[[1]] %in% trach_codes, , drop = FALSE]
+
+  # Helper: write a section header + rows
+  out_file <- paste(output_path, "/", "ICD_codes.csv", sep = "")
+  if (!dir.exists(output_path)) dir.create(output_path, recursive = TRUE)
+
+  con <- file(out_file, open = "wt")
+
+  write_section <- function(con, title, df2) {
+    # Section header row (single-cell row)
+    writeLines(title, con)
+    # Column header for this section
+    writeLines("code,description", con)
+    # Data rows (first two columns only)
+    if (nrow(df2) > 0) {
+      write.table(
+        df2,
+        file = con,
+        sep = ",",
+        row.names = FALSE,
+        col.names = FALSE,
+        quote = TRUE
+      )
+    }
+    # blank line between sections
+    writeLines("", con)
+  }
+
+  write_section(con, "Craniotomy codes", crani_rows)
+  write_section(con, "Gastrostomy codes", gastro_rows)
+  write_section(con, "Tracheostomy codes", trach_rows)
+
+  close(con)
+
+  message("Wrote ICD lookup matches to: ", out_file)
+}
+
+
 ### Filter the loaded data ###
 
 df <- df %>% filter(ageyears >= min_ageyears)
