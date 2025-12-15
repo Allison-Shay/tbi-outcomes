@@ -257,19 +257,19 @@ options(width = 300)
 print(summary_df[order(summary_df$type, decreasing=TRUE),], row.names = FALSE)
 cat("Rows:", nrow(df), "\nColumns:", ncol(df), "\n")
 
-data <- df
+data <- read.csv("final_data_merged/cleaned.csv")
 
 data_analytic <- data %>%
   filter(!is.na(minority))%>%
-  filter(!is.na(sex), sex %in% c(1, 2))%>%
+  filter(!is.na(sex), sex %in% c(1,2))%>%
   filter(!is.na(teachingstatus))%>%
   filter(!is.na(verificationlevel))%>%
   filter(!is.na(totalgcs))%>%
   filter(!is.na(iss))%>%
-  filter(!is.na(tbimidlineshift))%>%
+  filter(!is.na(tbimidlineshift), tbimidlineshift %in% c(1,2))%>%
   filter(!is.na(statedesignation))%>%
-  filter(!is.na(hospdischargedisposition))%>%
-  filter(!is.na(withdrawallst))%>%
+  # filter(!is.na(hospdischargedisposition))%>%   # Don't exclude upfront (avoid selection bias)
+  # filter(!is.na(withdrawallst))%>%              # Don't exclude upfront
   filter(!is.na(ich_category))
 
 
@@ -280,9 +280,6 @@ data_analytic <- data_analytic %>%
     trach      = ifelse(is.na(trach), 0, trach),
     gastro     = ifelse(is.na(gastro), 0, gastro),
     neurosurg_any = ifelse(icpparench == 1 | icpevdrain == 1, 1, 0),
-    mort_inhospital <- ifelse(matched$hospdischargedisposition == 5, 1, 0),
-    ltc_inhospital <- ifelse(matched$hospdischargedisposition == 12, 1, 0),
-    withdrawallst_bin = ifelse(withdrawallst == 1, 0, 1)
   )
 
 data_analytic <- data_analytic %>%
@@ -292,6 +289,25 @@ data_analytic <- data_analytic %>%
     verificationlevel = factor(verificationlevel),
     teachingstatus   = factor(teachingstatus)
   )
+
+data_analytic <- data_analytic %>%
+  mutate(
+    mort_inhospital = case_when(
+      hospdischargedisposition == 5  ~ 1L,
+      hospdischargedisposition %in% c(1:99) ~ 0L,  # other valid codes
+      TRUE ~ NA_integer_
+    ),
+    ltc_inhospital = case_when(
+      hospdischargedisposition == 12 ~ 1L,
+      hospdischargedisposition %in% c(1:99) ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    withdrawallst_bin = case_when(
+      withdrawallst == 2 ~ 1L,
+      withdrawallst == 1 ~ 0L,
+      TRUE ~ NA_integer_
+    )
+)
 
 ps_formula <- minority ~ ageyears + sex + iss +
   verificationlevel + teachingstatus +
@@ -347,14 +363,40 @@ evd_out
 trach_out <- run_logit_cluster(trach ~ minority, matched, matched$subclass)
 trach_out
 gastro_out <- run_logit_cluster(gastro ~ minority, matched, matched$subclass)
-gastro_out
-mort_out <- run_logit_cluster(mort_inhospital ~ minority, matched, matched$subclass)
-mort_out
-ltc_out <- run_logit_cluster(ltc_inhospital ~ minority, matched, matched$subclass)
-ltc_out
-wlt_out <- run_logit_cluster(withdrawallst_bin ~ minority, matched_wlt, matched_wlt$subclass)
-wlt_out
+gastro_out              
 
+# For regressions where we're now going to exclude NA's
+
+matched_mort <- matched %>%
+  filter(!is.na(mort_inhospital))
+
+mort_out <- run_logit_cluster(
+  mort_inhospital ~ minority,
+  matched_mort,
+  matched_mort$subclass
+)
+mort_out
+
+matched_ltc <- matched %>%
+  filter(!is.na(ltc_inhospital))
+
+ltc_out <- run_logit_cluster(
+  ltc_inhospital ~ minority,
+  matched_ltc,
+  matched_ltc$subclass
+)
+ltc_out
+
+
+matched_wlt <- matched %>%
+  filter(!is.na(withdrawallst_bin))
+
+wlt_out <- run_logit_cluster(
+  withdrawallst_bin ~ minority,
+  matched_wlt,
+  matched_wlt$subclass
+)
+wlt_out
 
 
 
