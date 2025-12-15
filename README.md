@@ -48,4 +48,4 @@ The output will be stored in a directory named **final_data_merged**
 
 <pre>Rscript analysis.R</pre>
 
-The output will be stored in a directory named **output**
+The output will be stored in a directory named **analysis**
