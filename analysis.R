@@ -12,9 +12,14 @@ library(tibble)
 library(estimatr)
 
 
-###### Data filename #########
+###### File paths #########
 
 fname <- "final_data_merged/cleaned.csv"
+output_dir <- "output"
+
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
 
 ###### Read in the data ######
 
@@ -133,11 +138,25 @@ for (col_name in names(df)) {
 
 ####### Print out the data summary table #######
 
-options(width = 300)
-print(summary_df[order(summary_df$type, decreasing=TRUE),], row.names = FALSE)
+write.csv(summary_df[order(summary_df$type, decreasing=TRUE),], file.path(output_dir, "raw_data_summary.csv"), row.names=FALSE)
 cat("Rows:", nrow(df), "\nColumns:", ncol(df), "\n")
 
 ####### Filter the data based on criteria of excluding missing/bad vaules ########
+
+# This will store number of encounters (note: not patients, because TQIP only stores encounter IDs) at each filtering step
+filter_log <- data.frame(
+  step = character(),
+  n = integer(),
+  stringsAsFactors = FALSE
+)
+log_step <- function(df, name, log_df) {
+  rbind(
+    log_df,
+    data.frame(step = name, n = nrow(df), stringsAsFactors = FALSE)
+  )
+}
+filter_log <- log_step(raw_df, "Raw", filter_log)
+
 
 data <- raw_df
 
@@ -158,6 +177,9 @@ apply_analytic_filters <- function(data_frame) {
 
 data_analytic <- apply_analytic_filters(data)
 data_analytic_mod <- transform_analysis_vars(data_analytic) # Simply change things from numerical to things like Yes/No Male/Female etc.
+
+filter_log <- log_step(data_analytic, "Filtered (removed missing/bad values)", filter_log)
+write_csv(filter_log, paste(output_dir, "/", "filtering_summary.csv", sep=""))
 
 ######## Run statistical analysis to compare groups ########
 
@@ -237,7 +259,7 @@ table1_pvals <- bind_rows(results_num, results_cat) %>%
   ) %>%
   arrange(type, p_value)
 
-print(table1_pvals, n = Inf)
+write.csv(table1_pvals, file.path(output_dir, "raw_data_statistics.csv"), row.names=FALSE)
 
 
 ######## Make some new data variables and factorize some existing ones ########
@@ -306,8 +328,22 @@ m.out <- matchit(
 
 ######## Results of propensity matching ########
 
-summary(m.out)
-love.plot(m.out)
+
+out <- capture.output(summary(m.out))
+writeLines(out, file.path(output_dir, "matchit_summary.txt"))
+pdf(file.path(output_dir, "love_plot.pdf"), width = 7, height = 5)
+love.plot(
+  m.out,
+  stats = "mean.diffs",
+  abs = TRUE,
+  threshold = 0.1,
+  var.order = "unadjusted",
+  standardize = TRUE,
+  binary = "std",
+  colors = c("grey60", "black")
+)
+dev.off()
+
 
 
 ####### Regression analyses #########
@@ -407,5 +443,111 @@ monitor_days_out
 #coeftest(fit_mid, vcov = vcov_cluster)
 
 
+# ---- helpers ----
+
+fmt_p <- function(p) {
+  if (is.na(p)) return(NA_character_)
+  if (p < 0.001) "<0.001" else sprintf("%.3f", p)
+}
+
+fmt_ci <- function(lo, hi, digits = 2) {
+  paste0(sprintf(paste0("%.", digits, "f"), lo),
+         " to ",
+         sprintf(paste0("%.", digits, "f"), hi))
+}
+
+# Logistic: input is coeftest matrix from run_logit_cluster()
+summ_logit <- function(coeftest_mat, outcome, n_used, term = "minority") {
+  # coeftest_mat rows are (Intercept), minority, etc.
+  if (!(term %in% rownames(coeftest_mat))) {
+    return(tibble(
+      outcome = outcome, model = "Logistic", n = n_used,
+      estimate = NA_character_, ci_95 = NA_character_, p_value = NA_character_
+    ))
+  }
+
+  b  <- coeftest_mat[term, "Estimate"]
+  se <- coeftest_mat[term, "Std. Error"]
+  p  <- coeftest_mat[term, "Pr(>|z|)"]
+
+  # OR + Wald CI on log-odds scale
+  or  <- exp(b)
+  lo  <- exp(b - 1.96 * se)
+  hi  <- exp(b + 1.96 * se)
+
+  tibble(
+    outcome = outcome,
+    model = "Logistic (OR)",
+    n = n_used,
+    estimate = sprintf("%.2f", or),
+    ci_95 = fmt_ci(lo, hi, digits = 2),
+    p_value = fmt_p(p)
+  )
+}
+
+# Linear: input is lm_robust object
+summ_lm <- function(lmrob, outcome, n_used, term = "minority") {
+  s <- summary(lmrob)
+  ct <- s$coefficients
+  if (!(term %in% rownames(ct))) {
+    return(tibble(
+      outcome = outcome, model = "Linear (Δ days)", n = n_used,
+      estimate = NA_character_, ci_95 = NA_character_, p_value = NA_character_
+    ))
+  }
+
+  b  <- ct[term, "Estimate"]
+  lo <- ct[term, "CI Lower"]
+  hi <- ct[term, "CI Upper"]
+  p  <- ct[term, "Pr(>|t|)"]
+
+  tibble(
+    outcome = outcome,
+    model = "Linear (Δ days)",
+    n = n_used,
+    estimate = sprintf("%.2f", b),
+    ci_95 = fmt_ci(lo, hi, digits = 2),
+    p_value = fmt_p(p)
+  )
+}
+
+# ---- build the paper table ----
+# NOTE: if minority is a factor, the term might be "minorityMinority"
+# If your coefficient rowname isn't exactly "minority", change term= below accordingly.
+
+term_name <- "minority"
+# term_name <- "minorityMinority"   # <- uncomment if needed
+
+results_table <- bind_rows(
+  summ_logit(parench_out, "ICP parenchymal monitor", nrow(matched), term = term_name),
+  summ_logit(evd_out,     "EVD placed",             nrow(matched), term = term_name),
+  summ_logit(trach_out,   "Tracheostomy",           nrow(matched), term = term_name),
+  summ_logit(gastro_out,  "Gastrostomy",            nrow(matched), term = term_name),
+
+  summ_logit(mort_out,    "In-hospital mortality",  nrow(matched_mort), term = term_name),
+  summ_logit(ltc_out,     "Discharge to LTC",       nrow(matched_ltc),  term = term_name),
+
+  # WARNING: your WLST glm had convergence/separation issues earlier.
+  # If you used logistf (Firth), DON'T summarize it with summ_logit().
+  # Replace this row with a separate Firth summary.
+  summ_logit(wlt_out,     "Withdrawal of LST",      nrow(matched_wlt),  term = term_name),
+
+  summ_lm(los_out,        "Hospital LOS",           nrow(matched), term = term_name),
+  summ_lm(icu_out,        "ICU LOS",                nrow(matched), term = term_name),
+  summ_lm(vent_out,       "Ventilator days",        nrow(matched), term = term_name),
+
+  summ_lm(monitor_days_out, "Cerebral monitoring days", nrow(matched_monitor), term = term_name)
+) %>%
+  mutate(
+    contrast = "Minority vs White"
+  ) %>%
+  select(outcome, model, contrast, n, estimate, ci_95, p_value)
+
+
+write.csv(results_table, file.path(output_dir, "final_analysis.csv"), row.names = FALSE)
+
+
+
+              
 
 
