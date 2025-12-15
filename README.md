@@ -36,9 +36,10 @@ Rscript PUF_process.R 2019
 Rscript PUF_process.R 2018
 </pre>
 
-(note: optionally supplying the ICD argument means to output the ICD code descriptions into the output directory)
-
 The output will be stored in a directory named **final_data**
+
+*(note: optionally supplying the ICD argument means to output the ICD code descriptions into the output directory as final_data/ICD_codes.csv)*
+
 
 ## 3. Merge the data
 
