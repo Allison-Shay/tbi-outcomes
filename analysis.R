@@ -30,12 +30,12 @@ df <- raw_df
 
 transform_analysis_vars <- function(df) {
 
-  # Optional safety check (highly recommended)
+  # Safety check
   required_cols <- c(
     "minority", "sex", "teachingstatus", "verificationlevel",
     "trach", "gastro", "icpparench", "icpevdrain",
     "withdrawallst", "tbimidlineshift", "ich_category",
-    "statedesignation", "hospdischargedisposition"
+    "statedesignation", "hospdischargedisposition", "totalgcs"
   )
 
   missing_cols <- setdiff(required_cols, names(df))
@@ -75,7 +75,12 @@ transform_analysis_vars <- function(df) {
         tbimidlineshift == 2 ~ "No",
         TRUE ~ NA_character_
       ) %>% factor(levels = c("Yes", "No")),
-
+      gcs_cat = case_when(
+        !is.na(totalgcs) & totalgcs <= 8  ~ "Severe",
+        !is.na(totalgcs) & totalgcs <= 12 ~ "Moderate",
+        !is.na(totalgcs)                  ~ "Mild",
+        TRUE ~ NA_character_
+      ) %>% factor(levels = c("Mild", "Moderate", "Severe")),
       ich_category = factor(ich_category),
       statedesignation = factor(statedesignation),
       hospdischargedisposition = factor(hospdischargedisposition)
