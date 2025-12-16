@@ -52,3 +52,9 @@ The output will be stored in a directory named **final_data_merged**
 <pre>Rscript analysis.R</pre>
 
 The output will be stored in a directory named **analysis**
+
+## TODO:
+
+1. Paritiion GCS into categories when displaying the raw (i.e. baseline) statistics
+2. Fix midline shift
+3. Make forest plot
