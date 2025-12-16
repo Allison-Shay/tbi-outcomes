@@ -547,14 +547,18 @@ m.out <- matchit(
 covar_labels <- c(
   distance = "Propensity score",
   ageyears = "Age (years)",
-  sex_2 = "Sex",
-  verificationlevel_1 = "Trauma center level I",
-  verificationlevel_2 = "Trauma center level II",
-  verificationlevel_3 = "Trauma center level III",
+  sex_Female = "Sex",
+  verificationlevel_1 = "ACS-verified trauma level: I",
+  verificationlevel_2 = "ACS-verified trauma level: II",
+  verificationlevel_3 = "ACS-verified trauma level: III",
   teachingstatus = "Hospital teaching status",
-  statedesignation = "State trauma designation",
-  iss = "Injury Severity Score (ISS)",
-  tbimidlineshift_2 = "Midline shift present",
+  statedesignation_1 = "State trauma designation level: I",
+  statedesignation_2 = "State trauma designation level: II",
+  statedesignation_3 = "State trauma designation level: III",
+  statedesignation_4 = "State trauma designation level: IV",
+  statedesignation_6 = "State trauma designation level: Other",
+  iss = "Injury severity score (ISS)",
+  tbimidlineshift_No = "Midline shift present",
   gcs_cat_Mild = "GCS: Mild (13–15)",
   gcs_cat_Moderate = "GCS: Moderate (9–12)",
   gcs_cat_Severe = "GCS: Severe (≤8)",
@@ -562,8 +566,8 @@ covar_labels <- c(
   `ich_category_isolated EDH` = "Isolated EDH",
   `ich_category_isolated SAH` = "Isolated SAH",
   `ich_category_isolated IPH` = "Isolated IPH",
-  `ich_category_>=2 concomitant ICHs` = "≥2 concomitant ICH subtypes",
-  `ich_category_other/unspecified ICH` = "Other / unspecified ICH"
+  `ich_category_>=2 concomitant ICHs` = "≥2 concomitant ICH types",
+  `ich_category_other/unspecified ICH` = "Isolated other/unspecified ICH"
 )
 
 
@@ -579,7 +583,8 @@ love.plot(
   var.order = "unadjusted",
   standardize = TRUE,
   binary = "std",
-  colors = c("grey60", "black")
+  colors = c("grey60", "black"),
+  var.names = covar_labels
 )
 dev.off()
 
