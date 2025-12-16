@@ -180,7 +180,7 @@ apply_analytic_filters <- function(data_frame) {
   filter(!is.na(totalgcs))%>%
   filter(!is.na(iss))%>%
   filter(!is.na(tbimidlineshift), tbimidlineshift %in% c(1,2))%>%
-  filter(!is.na(statedesignation))%>%
+  filter(!is.na(statedesignation), statedesignation %in% c(1,2,3,4,6))%>% # 5 doesn't exist for statedesignation and 7 = "not applicable"
   # filter(!is.na(hospdischargedisposition))%>%   # Don't exclude upfront (avoid selection bias)
   # filter(!is.na(withdrawallst))%>%              # Don't exclude upfront
   filter(!is.na(ich_category))
@@ -529,14 +529,8 @@ ps_formula <- minority ~ ageyears + sex + iss +
   verificationlevel + teachingstatus +
   ich_category + statedesignation + tbimidlineshift
 
-data_ps <- data_analytic %>%
-  mutate(
-    gcs_cat = case_when(
-      totalgcs <= 8  ~ "Severe",
-      totalgcs <= 12 ~ "Moderate",
-      TRUE ~ "Mild"
-    )
-  )
+data_ps <- transform_analysis_vars(data_analytic)
+
 m.out <- matchit(
   ps_formula,
   data = data_ps,
@@ -547,9 +541,33 @@ m.out <- matchit(
 )
 
 
-######## Results of propensity matching ########
+######## Display the propensity matching results ########
 
 
+covar_labels <- c(
+  distance = "Propensity score",
+  ageyears = "Age (years)",
+  sex_2 = "Sex",
+  verificationlevel_1 = "Trauma center level I",
+  verificationlevel_2 = "Trauma center level II",
+  verificationlevel_3 = "Trauma center level III",
+  teachingstatus = "Hospital teaching status",
+  statedesignation = "State trauma designation",
+  iss = "Injury Severity Score (ISS)",
+  tbimidlineshift_2 = "Midline shift present",
+  gcs_cat_Mild = "GCS: Mild (13–15)",
+  gcs_cat_Moderate = "GCS: Moderate (9–12)",
+  gcs_cat_Severe = "GCS: Severe (≤8)",
+  `ich_category_isolated SDH` = "Isolated SDH",
+  `ich_category_isolated EDH` = "Isolated EDH",
+  `ich_category_isolated SAH` = "Isolated SAH",
+  `ich_category_isolated IPH` = "Isolated IPH",
+  `ich_category_>=2 concomitant ICHs` = "≥2 concomitant ICH subtypes",
+  `ich_category_other/unspecified ICH` = "Other / unspecified ICH"
+)
+
+
+    
 out <- capture.output(summary(m.out))
 writeLines(out, file.path(output_dir, "matchit_summary.txt"))
 pdf(file.path(output_dir, "love_plot.pdf"), width = 7, height = 5)
@@ -654,16 +672,6 @@ monitor_days_out
 
 
 
-# Midline shift
-#matched_mid <- matched_mid %>%
-#  mutate(tbimidlineshift_bin = ifelse(tbimidlineshift == 2, 1, 0))  # assuming 2 = shift, 1 = no shift
-
-# Then run logistic with clustered SE
-#fit_mid <- glm(tbimidlineshift_bin ~ minority, data = matched_mid, family = binomial)
-#vcov_cluster <- vcovCL(fit_mid, cluster = matched_mid$subclass)
-#coeftest(fit_mid, vcov = vcov_cluster)
-
-
 # ---- helpers ----
 
 fmt_p <- function(p) {
@@ -736,8 +744,8 @@ summ_lm <- function(lmrob, outcome, n_used, term = "minority") {
 # NOTE: if minority is a factor, the term might be "minorityMinority"
 # If your coefficient rowname isn't exactly "minority", change term= below accordingly.
 
-term_name <- "minority"
-# term_name <- "minorityMinority"   # <- uncomment if needed
+# term_name <- "minority"
+term_name <- "minorityMinority"   # <- uncomment if needed
 
 results_table <- bind_rows(
   summ_logit(parench_out, "ICP parenchymal monitor", nrow(matched), term = term_name),
