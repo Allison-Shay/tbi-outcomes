@@ -526,9 +526,11 @@ data_analytic <- data_analytic %>%
 
 
 ps_formula <- minority ~ ageyears + sex + iss +
-  verificationlevel + teachingstatus +
-  ich_category + statedesignation + tbimidlineshift
+  tbimidlineshift + ich_category +
+  teachingstatus + verificationlevel +
+  statedesignation
 
+    
 data_ps <- transform_analysis_vars(data_analytic)
 
 m.out <- matchit(
