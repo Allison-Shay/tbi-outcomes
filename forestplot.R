@@ -173,8 +173,8 @@ make_combo_plot <- function(df_sub, out_pdf, kind = c("logistic", "linear")) {
   )
 
   # your preferred compact height
-  plot_h <- 1.0 + 0.16 * n_rows
-  ggsave(out_pdf, combined, width = 12.5, height = plot_h, units = "in")
+  attr(combined, "plot_height") <- 1.0 + 0.24 * n_rows
+  combined
 }
 
 df <- read_csv(input_file, show_col_types = FALSE) %>% prep_df()
@@ -182,9 +182,27 @@ df <- read_csv(input_file, show_col_types = FALSE) %>% prep_df()
 df_logit  <- df %>% filter(str_detect(model, "Logistic"))
 df_linear <- df %>% filter(str_detect(model, "Linear"))
 
-make_combo_plot(df_logit,  out_logistic, kind = "logistic")
-make_combo_plot(df_linear, out_linear,   kind = "linear")
+plot_logistic <- make_combo_plot(df_logit,  kind = "logistic")
+plot_linear   <- make_combo_plot(df_linear, kind = "linear")
+
+h_logit  <- attr(plot_logistic, "plot_height")
+h_linear <- attr(plot_linear,   "plot_height")
+
+combined_vertical <- cowplot::plot_grid(
+  plot_logistic,
+  plot_linear,
+  ncol = 1,
+  rel_heights = c(h_logit, h_linear),
+  align = "v"
+)
+
+ggsave(
+  "analysis/forest_plot_combined.pdf",
+  combined_vertical,
+  width = 12.5,
+  height = h_logit + h_linear,
+  units = "in"
+)
 
 cat("Wrote:\n")
-cat("  ", out_logistic, "\n", sep = "")
-cat("  ", out_linear, "\n", sep = "")
+cat("  analysis/forest_plot_combined.pdf\n")
