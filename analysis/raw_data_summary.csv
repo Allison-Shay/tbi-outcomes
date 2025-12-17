@@ -27,3 +27,4 @@
 "tbimidlineshift","categorical",2361,"Yes, No"
 "trach","categorical",0,"No, Yes"
 "gastro","categorical",0,"No, Yes"
+"gcs_cat","categorical",1919,"Mild, Moderate, Severe"
