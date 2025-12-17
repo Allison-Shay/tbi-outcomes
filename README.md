@@ -53,3 +53,6 @@ The output will be stored in a directory named **final_data_merged**
 
 The output will be stored in a directory named **analysis**
 
+# 5. Make forest plots
+
+<pre>Rscript forestplot.R</pre>
