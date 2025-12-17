@@ -783,10 +783,10 @@ results_table <- bind_rows(
 
 write.csv(results_table, file.path(output_dir, "final_analysis.csv"), row.names = FALSE)
 
-filter_log <- log_step_n(nrow(matched[matched$minority == 0,]), "White", filter_log)
-filter_log <- log_step_n(nrow(matched[matched$minority == 1,]), "Minority", filter_log)
-filter_log <- log_step_n(nrow(matched[matched$sex == 1,]), "(Male)", filter_log)
-filter_log <- log_step_n(nrow(matched[matched$sex == 2,]), "(Female)", filter_log)
+filter_log <- log_step_n(nrow(matched[matched$minority != "Minority",]), "White", filter_log)
+filter_log <- log_step_n(nrow(matched[matched$minority == "Minority",]), "Minority", filter_log)
+filter_log <- log_step_n(nrow(matched[matched$sex == "Male",]), "(Male)", filter_log)
+filter_log <- log_step_n(nrow(matched[matched$sex == "Female",]), "(Female)", filter_log)
 write_csv(filter_log, paste(output_dir, "/", "filtering_summary.csv", sep=""))
 
 
