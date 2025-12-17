@@ -121,16 +121,16 @@ make_combo_plot <- function(df_sub, out_pdf, kind = c("logistic", "linear")) {
   y_expand <- expansion(mult = c(0.14, 0.22))
 
   p_left <- ggplot(df_sub, aes(y = outcome_f)) +
-    geom_text(aes(x = 0, label = outcome), hjust = 0, size = 3.6) +
-    geom_text(aes(x = 1, label = est_ci_txt), hjust = 0, size = 3.6) +
+    geom_text(aes(x = 0.92, label = outcome), hjust = 0, size = 3.6) +
+    geom_text(aes(x = 1.45, label = est_ci_txt), hjust = 0, size = 3.6) +
     scale_x_continuous(limits = c(0, 1.75), breaks = NULL) +
     scale_y_discrete(expand = y_expand) +
     coord_cartesian(clip = "off") +
     theme_void(base_size = 11) +
     theme(plot.margin = margin(14, 0, 6, 8)) +
-    annotate("text", x = 0, y = n_rows + 0.9, label = "Outcome",
+    annotate("text", x = 0.92, y = n_rows + 0.9, label = "Outcome",
              fontface = "bold", hjust = 0, size = 3.9) +
-    annotate("text", x = 1, y = n_rows + 0.9, label = "Estimate (95% CI)",
+    annotate("text", x = 1.45, y = n_rows + 0.9, label = "Estimate (95% CI)",
              fontface = "bold", hjust = 0, size = 3.9)
 
   p_mid <- ggplot(df_sub, aes(x = est, y = outcome_f)) +
@@ -160,7 +160,7 @@ make_combo_plot <- function(df_sub, out_pdf, kind = c("logistic", "linear")) {
     scale_y_discrete(expand = y_expand) +
     coord_cartesian(clip = "off") +
     theme_void(base_size = 11) +
-    theme(plot.margin = margin(14, 10, 6, 0)) +
+    theme(plot.margin = margin(14, 40, 6, 0)) +
     annotate("text", x = 0, y = n_rows + 0.9, label = "P value",
              fontface = "bold", hjust = 1, size = 3.9)
 
