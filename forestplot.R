@@ -13,6 +13,27 @@ input_file  <- "analysis/final_analysis.csv"
 out_logistic <- "analysis/forest_plot_logistic.pdf"
 out_linear   <- "analysis/forest_plot_linear.pdf"
 
+# Remove 0's before decimal point for p-values
+fmt_p_no0 <- function(p) {
+  if (is.na(p)) return(NA_character_)
+
+  p <- as.character(p)
+
+  # handle strings like "<0.001"
+  if (grepl("^<\\s*0\\.", p)) {
+    return(sub("^<\\s*0\\.", "<.", p))
+  }
+
+  # handle numeric p-values
+  p_num <- suppressWarnings(as.numeric(p))
+  if (!is.na(p_num)) {
+    return(sub("^0\\.", ".", sprintf("%.3f", p_num)))
+  }
+
+  p
+}
+
+
 parse_ci <- function(ci_vec) {
   parts <- str_split(as.character(ci_vec), "\\s+to\\s+", simplify = TRUE)
   tibble(
@@ -28,7 +49,7 @@ prep_df <- function(df) {
       est = suppressWarnings(as.numeric(estimate)),
       lo  = ci$lo,
       hi  = ci$hi,
-      p_txt = as.character(p_value),
+      p_txt = stringr::str_replace_all(as.character(p_value), "0\\.", "."),
       est_ci_txt = sprintf("%.2f (%.2f–%.2f)", est, lo, hi)
     ) %>%
     filter(is.finite(est), is.finite(lo), is.finite(hi))
@@ -60,7 +81,7 @@ make_combo_plot <- function(df_sub, out_pdf, kind = c("logistic", "linear")) {
     x_limits <- exp(c(-max_abs_log, max_abs_log))
 
     # ticks (keep within limits)
-    tick_candidates <- c(0.25, 0.33, 0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3, 4)
+    tick_candidates <- c(0.25, 0.33, 0.5, 0.6, 0.8, 1, 1.2, 1.4, 2, 3, 4)
     x_breaks <- tick_candidates[tick_candidates >= x_limits[1] & tick_candidates <= x_limits[2]]
     if (length(x_breaks) < 3) x_breaks <- exp(pretty(log(x_limits), n = 7))
 
@@ -146,7 +167,7 @@ make_combo_plot <- function(df_sub, out_pdf, kind = c("logistic", "linear")) {
   combined <- cowplot::plot_grid(
     p_left, p_mid, p_right,
     nrow = 1,
-    rel_widths = c(1.55, 1.18, 0.34),
+    rel_widths = c(1.55, 1.05, 0.28),
     align = "h",
     axis = "tb"
   )
