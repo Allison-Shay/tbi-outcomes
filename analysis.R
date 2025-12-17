@@ -586,6 +586,7 @@ love.plot(
   standardize = TRUE,
   binary = "std",
   colors = c("grey60", "black"),
+  shapes = c(17, 16),
   var.names = covar_labels
 )
 dev.off()
