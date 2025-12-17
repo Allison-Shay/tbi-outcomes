@@ -562,14 +562,14 @@ covar_labels <- c(
   `ich_category_other/unspecified ICH` = "Isolated other/unspecified ICH",
   `ich_category_>=2 concomitant ICHs` = "Multiple concomitant ICH types",
   teachingstatus = "Hospital teaching status",
-  verificationlevel_1 = "ACS-verified trauma level: I",
-  verificationlevel_2 = "ACS-verified trauma level: II",
-  verificationlevel_3 = "ACS-verified trauma level: III",
-  statedesignation_1 = "State trauma designation level: I",
-  statedesignation_2 = "State trauma designation level: II",
-  statedesignation_3 = "State trauma designation level: III",
-  statedesignation_4 = "State trauma designation level: IV",
-  statedesignation_6 = "State trauma designation level: Other"
+  verificationlevel_1 = "ACS-verified trauma level I",
+  verificationlevel_2 = "ACS-verified trauma level II",
+  verificationlevel_3 = "ACS-verified trauma level III",
+  statedesignation_1 = "State trauma designation level I",
+  statedesignation_2 = "State trauma designation level II",
+  statedesignation_3 = "State trauma designation level III",
+  statedesignation_4 = "State trauma designation level IV",
+  statedesignation_6 = "State trauma designation level—other"
 )
 
 
