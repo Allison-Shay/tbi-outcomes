@@ -36,7 +36,7 @@ prep_df <- function(df) {
 
 make_combo_plot <- function(df_sub, out_pdf, kind = c("logistic", "linear")) {
   kind <- match.arg(kind)
-  y_expand <- expansion(mult = c(0.02, 0.22))
+  y_expand <- expansion(mult = c(0.14, 0.22))
 
   df_sub <- df_sub %>%
     mutate(outcome = as.character(outcome)) %>%
@@ -97,7 +97,7 @@ make_combo_plot <- function(df_sub, out_pdf, kind = c("logistic", "linear")) {
   }
 
   n_rows <- nlevels(df_sub$outcome_f)
-  y_expand <- expansion(mult = c(0.02, 0.22))
+  y_expand <- expansion(mult = c(0.14, 0.22))
 
   p_left <- ggplot(df_sub, aes(y = outcome_f)) +
     geom_text(aes(x = 0, label = outcome), hjust = 0, size = 3.6) +
