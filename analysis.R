@@ -558,6 +558,8 @@ dev.off()
 
 ####### Prepare for regression analysis ########
 
+matched <- match.data(m.out)
+
 # For regressions where we're going to exclude NA's
 
 matched_mort <- matched %>%
@@ -617,7 +619,6 @@ run_rr_cluster <- function(formula, data, cluster) {
 }
 
 
-matched <- match.data(m.out)
 parench_out_rr <- run_rr_cluster(icpparench ~ minority, matched, matched$subclass)
 evd_out_rr     <- run_rr_cluster(icpevdrain ~ minority, matched, matched$subclass)
 trach_out_rr   <- run_rr_cluster(trach ~ minority, matched, matched$subclass)
@@ -656,7 +657,6 @@ run_logit_cluster <- function(formula, data, cluster) {
   return(coefs)
 }
 
-matched <- match.data(m.out)
 #crani_out <- run_logit_cluster(crani ~ minority, matched, matched$subclass)
 #crani_out
 parench_out <- run_logit_cluster(icpparench ~ minority, matched, matched$subclass)
