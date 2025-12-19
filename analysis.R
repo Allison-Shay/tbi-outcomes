@@ -556,11 +556,21 @@ love.plot(
 )
 dev.off()
 
+####### Prepare for regression analysis ########
 
+# For regressions where we're going to exclude NA's
 
-####### Regression analyses #########
+matched_mort <- matched %>%
+  filter(!is.na(mort_inhospital))
+
+matched_ltc <- matched %>%
+  filter(!is.na(ltc_inhospital))
+
+matched_wlt <- matched %>%
+  filter(!is.na(withdrawallst_bin))
 
 # Helper function: clustered-robust SE by subclass
+
 cluster_se <- function(model, cluster) {
   M <- length(unique(cluster))
   N <- length(cluster)
@@ -568,9 +578,76 @@ cluster_se <- function(model, cluster) {
   dfc <- (M / (M - 1)) * ((N - 1) / (N - K))  # finite-sample correction
   
   uj <- apply(estfun(model), 2, function(x) tapply(x, cluster, sum))
-  vcovCL <- dfc * sandwich(model, meat. = crossprod(uj) / N)
+  vcovCL <- sandwich::vcovCL(model, cluster = cluster)    #   dfc * sandwich(model, meat. = crossprod(uj) / N)
   list(coef = coef(model), vcov = vcovCL)
+} 
+
+
+####### Regression analyses: Risk ratio #########
+
+
+run_rr_cluster <- function(formula, data, cluster) {
+  mf <- model.frame(formula, data = data, na.action = na.omit)
+
+  cl <- cluster
+  names(cl) <- rownames(data)
+  cl_used <- unname(cl[rownames(mf)])
+
+  if (anyNA(cl_used)) {
+    stop("Cluster ID could not be aligned for some model rows.", call. = FALSE)
+  }
+
+  y <- model.response(mf)
+  if (is.factor(y) || is.character(y) || is.logical(y)) {
+    y <- trimws(as.character(y))
+    if (all(c("No","Yes") %in% unique(y))) {
+      mf[[1]] <- ifelse(y == "Yes", 1, ifelse(y == "No", 0, NA_real_))
+    } else {
+      levs <- sort(unique(na.omit(y)))
+      if (length(levs) != 2) stop("Outcome must be binary (2 levels) for RR.", call. = FALSE)
+      mf[[1]] <- ifelse(y == levs[2], 1, 0)
+    }
+  } else {
+    mf[[1]] <- as.numeric(y)
+  }
+
+  fit <- glm(formula, data = mf, family = poisson(link = "log"))
+  clv <- cluster_se(fit, cl_used)
+  lmtest::coeftest(fit, vcov = clv$vcov)
 }
+
+
+matched <- match.data(m.out)
+parench_out_rr <- run_rr_cluster(icpparench ~ minority, matched, matched$subclass)
+evd_out_rr     <- run_rr_cluster(icpevdrain ~ minority, matched, matched$subclass)
+trach_out_rr   <- run_rr_cluster(trach ~ minority, matched, matched$subclass)
+gastro_out_rr  <- run_rr_cluster(gastro ~ minority, matched, matched$subclass)
+
+
+mort_out_rr <- run_rr_cluster(
+  mort_inhospital ~ minority,
+  matched_mort,
+  matched_mort$subclass
+)
+mort_out_rr
+
+ltc_out_rr <- run_rr_cluster(
+  ltc_inhospital ~ minority,
+  matched_ltc,
+  matched_ltc$subclass
+)
+ltc_out_rr
+
+wlt_out_rr <- run_rr_cluster(
+  withdrawallst_bin ~ minority,
+  matched_wlt,
+  matched_wlt$subclass
+)
+wlt_out_rr
+
+
+####### Regression analyses: Logit #########
+
 
 run_logit_cluster <- function(formula, data, cluster) {
   fit <- glm(formula, data = data, family = binomial)
@@ -591,10 +668,6 @@ trach_out
 gastro_out <- run_logit_cluster(gastro ~ minority, matched, matched$subclass)
 gastro_out              
 
-# For regressions where we're now going to exclude NA's
-
-matched_mort <- matched %>%
-  filter(!is.na(mort_inhospital))
 
 mort_out <- run_logit_cluster(
   mort_inhospital ~ minority,
@@ -603,19 +676,12 @@ mort_out <- run_logit_cluster(
 )
 mort_out
 
-matched_ltc <- matched %>%
-  filter(!is.na(ltc_inhospital))
-
 ltc_out <- run_logit_cluster(
   ltc_inhospital ~ minority,
   matched_ltc,
   matched_ltc$subclass
 )
 ltc_out
-
-
-matched_wlt <- matched %>%
-  filter(!is.na(withdrawallst_bin))
 
 wlt_out <- run_logit_cluster(
   withdrawallst_bin ~ minority,
@@ -657,6 +723,36 @@ fmt_ci <- function(lo, hi, digits = 2) {
          " to ",
          sprintf(paste0("%.", digits, "f"), hi))
 }
+
+# Risk ratios: input is coeftest matrix from run_rr_cluster()
+summ_rr <- function(coeftest_mat, outcome, n_used, term = "minority") {
+  # coeftest_mat rows are (Intercept), minority, etc.
+  if (!(term %in% rownames(coeftest_mat))) {
+    return(tibble(
+      outcome = outcome, model = "Risk", n = n_used,
+      estimate = NA_character_, ci_95 = NA_character_, p_value = NA_character_
+    ))
+  }
+
+  b  <- coeftest_mat[term, "Estimate"]
+  se <- coeftest_mat[term, "Std. Error"]
+  p  <- coeftest_mat[term, "Pr(>|z|)"]
+
+  # OR + Wald CI on log-odds scale
+  or  <- exp(b)
+  lo  <- exp(b - 1.96 * se)
+  hi  <- exp(b + 1.96 * se)
+
+  tibble(
+    outcome = outcome,
+    model = "Risk (RR)",
+    n = n_used,
+    estimate = sprintf("%.2f", or),
+    ci_95 = fmt_ci(lo, hi, digits = 2),
+    p_value = fmt_p(p)
+  )
+}
+
 
 # Logistic: input is coeftest matrix from run_logit_cluster()
 summ_logit <- function(coeftest_mat, outcome, n_used, term = "minority") {
@@ -729,10 +825,17 @@ results_table <- bind_rows(
   summ_logit(mort_out,    "In-hospital mortality",  nrow(matched_mort), term = term_name),
   summ_logit(ltc_out,     "Discharge to LTC",       nrow(matched_ltc),  term = term_name),
 
-  # WARNING: your WLST glm had convergence/separation issues earlier.
-  # If you used logistf (Firth), DON'T summarize it with summ_logit().
-  # Replace this row with a separate Firth summary.
   summ_logit(wlt_out,     "Withdrawal of LST",      nrow(matched_wlt),  term = term_name),
+
+  summ_rr(parench_out_rr, "ICP parenchymal monitor", nrow(matched), term = term_name),
+  summ_rr(evd_out_rr,     "EVD placed",             nrow(matched), term = term_name),
+  summ_rr(trach_out_rr,   "Tracheostomy",           nrow(matched), term = term_name),
+  summ_rr(gastro_out_rr,  "Gastrostomy",            nrow(matched), term = term_name),
+
+  summ_rr(mort_out_rr,    "In-hospital mortality",  nrow(matched_mort), term = term_name),
+  summ_rr(ltc_out_rr,     "Discharge to LTC",       nrow(matched_ltc),  term = term_name),
+
+  summ_rr(wlt_out_rr,     "Withdrawal of LST",      nrow(matched_wlt),  term = term_name),
 
   summ_lm(los_out,        "Hospital LOS",           nrow(matched), term = term_name),
   summ_lm(icu_out,        "ICU LOS",                nrow(matched), term = term_name),
