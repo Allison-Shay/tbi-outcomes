@@ -507,6 +507,7 @@ m.out <- matchit(
   exact = ~ gcs_cat     # <-- THIS IS NEEDED TO PROPENSITY MATCH GCS
 )
 
+matched <- match.data(m.out)
 
 ######## Display the propensity matching results ########
 
@@ -556,9 +557,135 @@ love.plot(
 )
 dev.off()
 
-####### Prepare for regression analysis ########
 
-matched <- match.data(m.out)
+####### Re-run statistics, this time for matched data ##########
+
+make_summary_df <- function(df, max_levels_to_print = 10) {
+  summary_df <- data.frame(
+    column = character(),
+    type = character(),
+    na_count = integer(),
+    value_summary = character(),
+    stringsAsFactors = FALSE
+  )
+  for (col_name in names(df)) {
+    x <- df[[col_name]]
+    n_na <- sum(is.na(x))
+    x_no_na <- x[!is.na(x)]
+    if (is.numeric(x)) {
+      type <- "numerical"
+      value_summary <- if (length(x_no_na) == 0) "all values are NA" else paste0(min(x_no_na), " to ", max(x_no_na))
+    } else {
+      type <- "categorical"
+      levs <- unique(x_no_na)
+      n_levels <- length(levs)
+      value_summary <- if (n_levels <= max_levels_to_print) paste(levs, collapse = ", ") else paste(n_levels, "categories")
+    }
+    summary_df <- rbind(
+      summary_df,
+      data.frame(column = col_name, type = type, na_count = n_na, value_summary = value_summary, stringsAsFactors = FALSE)
+    )
+  }
+  summary_df
+}
+
+matched_summary_df <- make_summary_df(matched, max_levels_to_print = 10)
+write.csv(matched_summary_df[order(matched_summary_df$type, decreasing=TRUE),],
+          file.path(output_dir, "matched_data_summary.csv"), row.names=FALSE)
+
+group_var <- "minority"
+
+exclude_vars <- c(
+  "distance", "weights", "subclass"  # MatchIt columns
+)
+
+num_vars_matched <- matched_summary_df %>%
+  filter(type == "numerical") %>%
+  pull(column) %>%
+  setdiff(exclude_vars)
+
+cat_vars_matched <- matched_summary_df %>%
+  filter(type == "categorical") %>%
+  pull(column) %>%
+  setdiff(c(group_var)) %>%
+  setdiff(exclude_vars)
+
+results_num_m <- map_dfr(num_vars_matched, function(v) {
+  tibble(
+    variable = v,
+    type = "continuous",
+    n_nonmissing = sum(!is.na(matched[[v]]) & !is.na(matched[[group_var]])),
+    p_value = test_numeric_wilcox(matched, v, group_var)
+  )
+})
+
+results_cat_m <- map_dfr(cat_vars_matched, function(v) {
+  x <- matched[[v]]
+  g <- matched[[group_var]]
+  ok <- !is.na(x) & !is.na(g)
+  tbl <- table(x[ok], g[ok])
+  tibble(
+    variable = v,
+    type = "categorical",
+    n_nonmissing = sum(ok),
+    n_levels = nrow(tbl),
+    table_cells = prod(dim(tbl)),
+    p_value = test_categorical_chisq(matched, v, group_var)
+  )
+})
+
+matched_table1_pvals <- bind_rows(results_num_m, results_cat_m) %>%
+  mutate(
+    p_value = ifelse(is.na(p_value), NA, signif(p_value, 3)),
+    note = case_when(
+      type == "categorical" & !is.na(table_cells) & table_cells > 20000 ~ "very large contingency table",
+      TRUE ~ ""
+    )
+  ) %>%
+  arrange(type, p_value)
+
+write.csv(matched_table1_pvals, file.path(output_dir, "matched_data_statistics.csv"), row.names=FALSE)
+
+g_all <- matched[[group_var]]
+g_levels <- sort(unique(na.omit(g_all)))
+g1 <- g_levels[1]
+g2 <- g_levels[2]
+
+# header rows
+N_total <- nrow(matched)
+N_g1 <- sum(g_all == g1, na.rm = TRUE)
+N_g2 <- sum(g_all == g2, na.rm = TRUE)
+
+header_rows <- tibble(
+  variable = c("N (encounters)", paste0("N: ", group_var, " = ", g1), paste0("N: ", group_var, " = ", g2)),
+  level = "",
+  overall = c(as.character(N_total), "", ""),
+  group1 = c("", as.character(N_g1), ""),
+  group2 = c("", "", as.character(N_g2)),
+  p_value = "",
+  missing = "",
+  type = "header",
+  note = ""
+)
+
+cont_rows <- map_dfr(num_vars_matched, ~ summarise_continuous(matched, .x, group_var, g1, g2))
+
+cat_rows <- map_dfr(cat_vars_matched, ~ summarise_categorical(
+  matched, .x, group_var, g1, g2, max_cat_levels_to_print, show_other_bucket
+))
+
+table1_matched <- bind_rows(header_rows, cont_rows, cat_rows) %>%
+  rename(
+    !!paste0(group_var, "=", g1) := group1,
+    !!paste0(group_var, "=", g2) := group2
+  )
+
+write.csv(table1_matched, file.path(output_dir, "matched_data_statistics_detailed.csv"), row.names=FALSE)
+
+
+
+
+####### Prepare for regression analysis ########
 
 # For regressions where we're going to exclude NA's
 
