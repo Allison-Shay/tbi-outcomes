@@ -289,41 +289,6 @@ fmt_p <- function(p) {
 
 fmt_num <- function(x, digits = 2) sprintf(paste0("%.", digits, "f"), x)
 
-# ---- variable lists from summary_df ----
-num_vars <- summary_df %>%
-  filter(type == "numerical") %>%
-  pull(column) %>%
-  setdiff(c("inc_key")) %>%
-  setdiff(exclude_vars)
-
-cat_vars <- summary_df %>%
-  filter(type == "categorical") %>%
-  pull(column) %>%
-  setdiff(c(group_var)) %>%
-  setdiff(exclude_vars)
-
-# ---- tests ----
-test_numeric_wilcox <- function(df, var, group) {
-  x <- df[[var]]
-  g <- df[[group]]
-  ok <- !is.na(x) & !is.na(g)
-  x <- x[ok]
-  g <- g[ok]
-  if (length(unique(g)) != 2) return(NA_real_)
-  tryCatch(wilcox.test(x ~ g)$p.value, error = function(e) NA_real_)
-}
-
-test_categorical_chisq <- function(df, var, group) {
-  x <- df[[var]]
-  g <- df[[group]]
-  ok <- !is.na(x) & !is.na(g)
-  x <- x[ok]
-  g <- g[ok]
-  if (length(unique(g)) != 2) return(NA_real_)
-  tbl <- table(x, g)
-  if (any(dim(tbl) < 2)) return(NA_real_)
-  tryCatch(chisq.test(tbl)$p.value, error = function(e) NA_real_)
-}
 
 # ---- group labels and sizes ----
 g_all <- data_analytic_mod[[group_var]]
