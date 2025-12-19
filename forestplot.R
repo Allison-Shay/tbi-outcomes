@@ -101,7 +101,7 @@ make_combo_plot <- function(df_sub, out_pdf, kind = c("logistic", "linear", "ris
     if (nrow(df_sub) == 0) stop("No valid risk rows (need positive OR/CI).", call. = FALSE)
 
     x_null <- 1
-    xlab <- "Odds ratio (95% CI)"
+    xlab <- "Risk ratio (95% CI)"
     decreased_label <- "Decreased risk"
     increased_label <- "Increased risk"
 
