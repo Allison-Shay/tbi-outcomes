@@ -254,7 +254,7 @@ if (length(args) >= 2 && args[2] == "ICD") {
     writeLines("", con)
   }
 
-  write_section("Craniotomy procedure codes", crani_rows)
+  write_section("Cranial procedure codes", crani_rows)
   write_section("Gastrostomy procedure codes", gastro_rows)
   write_section("Tracheostomy procedure codes", trach_rows)
 
