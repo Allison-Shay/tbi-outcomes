@@ -13,7 +13,8 @@ This was performed using **R version 4.1.3** or **R version 4.5.2 (2025-10-31)**
   "cobalt",
   "sandwich",
   "lmtest",
-  "estimatr"
+  "estimatr",
+  "cowplot"
 )</pre>
 
 Install any missing packages by running:
