@@ -481,8 +481,8 @@ data_analytic <- data_analytic %>%
       TRUE ~ NA_integer_
     ),
     withdrawallst_bin = case_when(
-      withdrawallst == 2 ~ 1L,
-      withdrawallst == 1 ~ 0L,
+      withdrawallst == 2 ~ 0L,
+      withdrawallst == 1 ~ 1L,
       TRUE ~ NA_integer_
     )
 )
