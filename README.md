@@ -57,3 +57,7 @@ The output will be stored in a directory named **analysis**
 # 5. Make forest plots
 
 <pre>Rscript forestplot.R</pre>
+
+# Acknowledgments
+
+The initial code that produced the analysis and figures used in the accompanying paper were written by Allison Shay and Delaney Sullivan. The OpenAI model, GPT-5.2, was subsequently used to make the code organized, reproducible, and easily-runnable for the purposes of this repository. This repository has been made openly available for transparency of methods, and it is released under an MIT license, a permissive open-source license.
