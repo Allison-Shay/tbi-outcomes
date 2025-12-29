@@ -53,6 +53,14 @@ transform_analysis_vars <- function(df) {
                         labels = c("White", "Minority")),
       sex = factor(sex, levels = c(1, 2),
                    labels = c("Male", "Female")),
+      age_cat = case_when(
+        ageyears >= 18 & ageyears <= 30  ~ "Age 18-30 years",
+        ageyears > 30 & ageyears <= 45 ~ "Age 31-45 years",
+        ageyears > 45 & ageyears <= 60 ~ "Age 46-60 years",
+        ageyears > 60 & ageyears <= 75 ~ "Age 61-75 years",
+        ageyears > 75 ~ "Age >75 years",
+        TRUE ~ NA_character_
+      ) %>% factor(levels = c("Age 18-30 years", "Age 31-45 years", "Age 46-60 years", "Age 61-75 years", "Age >75 years")),
 
       # Hospital characteristics
       teachingstatus = factor(teachingstatus),
@@ -81,6 +89,12 @@ transform_analysis_vars <- function(df) {
         !is.na(totalgcs)                  ~ "Mild",
         TRUE ~ NA_character_
       ) %>% factor(levels = c("Mild", "Moderate", "Severe")),
+      iss_cat = case_when(
+        iss < 12  ~ "ISS < 12",
+        iss >= 12 & iss <= 24 ~ "ISS 12-24",
+        iss > 24 ~ "ISS > 24",
+        TRUE ~ NA_character_
+      ) %>% factor(levels = c("ISS < 12", "ISS 12-24", "ISS > 24")),
       ich_category = factor(ich_category),
       statedesignation = factor(statedesignation),
       hospdischargedisposition = factor(hospdischargedisposition)
