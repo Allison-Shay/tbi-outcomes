@@ -1057,10 +1057,137 @@ filter_log <- log_step_n(nrow(matched[matched$sex == "Female",]), "(Female)", fi
 write_csv(filter_log, paste(output_dir, "/", "filtering_summary.csv", sep=""))
 
 
+######### Output a table based on trach+peg vs. none in the matched minority cohort #############
 
+matched2 <- matched %>%
+  mutate(
+    trach_peg = case_when(
+      trach == "Yes" | gastro == "Yes" ~ "Trach or PEG",
+      trach == "No"  & gastro == "No"  ~ "None",
+      TRUE ~ "None"
+    ) %>% factor(levels = c("None", "Trach or PEG"))
+  )
 
+minor_only <- matched2 %>%
+  filter(minority == "Minority") %>%
+  filter(trach_peg %in% c("None", "Trach or PEG")) %>%
+  droplevels()
 
+vars_cont <- c("ageyears", "iss", "totalgcs")
 
+vars_cat <- c(
+  "gcs_cat",
+  "mechanism",
+  "intent",
+  "verificationlevel",
+  "statedesignation",
+  "teachingstatus",
+  "hospitaltype",
+  "ich_category",
+  "tbimidlineshift",
+  "interfacilitytransfer",     # if present
+  "eddischargedisposition"     # if present (your derived ED transfer variable)
+)
 
+vars_cont <- vars_cont[vars_cont %in% names(minor_only)]
+vars_cat  <- vars_cat[vars_cat %in% names(minor_only)]
 
+group_var2 <- "trach_peg"
+g_all <- minor_only[[group_var2]]
+g_levels <- sort(unique(na.omit(g_all)))
+if (length(g_levels) != 2) stop("Need exactly 2 levels for trach_peg after filtering.", call. = FALSE)
+g1 <- g_levels[1]  # None
+g2 <- g_levels[2]  # Trach+PEG
 
+header_rows2 <- tibble::tibble(
+  variable = c("N (encounters)", paste0("N: ", group_var2, " = ", g1), paste0("N: ", group_var2, " = ", g2)),
+  level = "",
+  overall = c(as.character(nrow(minor_only)), "", ""),
+  group1 = c("", as.character(sum(g_all == g1, na.rm = TRUE)), ""),
+  group2 = c("", "", as.character(sum(g_all == g2, na.rm = TRUE))),
+  p_value = "",
+  missing = "",
+  type = "header",
+  note = ""
+)
+
+cont_rows2 <- purrr::map_dfr(vars_cont, ~ summarise_continuous(minor_only, .x, group_var2, g1, g2))
+cat_rows2  <- purrr::map_dfr(vars_cat,  ~ summarise_categorical(minor_only, .x, group_var2, g1, g2, max_levels = 30, show_other = TRUE))
+
+table_minority_trachpeg <- dplyr::bind_rows(header_rows2, cont_rows2, cat_rows2) %>%
+  dplyr::rename(
+    !!paste0(group_var2, "=", g1) := group1,
+    !!paste0(group_var2, "=", g2) := group2
+  )
+
+readr::write_csv(table_minority_trachpeg, file.path(output_dir, "table_minority_trachpeg_vs_none.csv"))
+
+######### Output a table based on trach+peg vs. none in the matched non-minority cohort #############
+
+matched2 <- matched %>%
+  mutate(
+    trach_peg = case_when(
+      trach == "Yes" | gastro == "Yes" ~ "Trach or PEG",
+      trach == "No"  & gastro == "No"  ~ "None",
+      TRUE ~ "None"
+    ) %>% factor(levels = c("None", "Trach or PEG"))
+  )
+
+minor_only <- matched2 %>%
+  filter(minority != "Minority") %>%
+  filter(trach_peg %in% c("None", "Trach or PEG")) %>%
+  droplevels()
+
+vars_cont <- c("ageyears", "iss", "totalgcs")
+
+vars_cat <- c(
+  "gcs_cat",
+  "mechanism",
+  "intent",
+  "verificationlevel",
+  "statedesignation",
+  "teachingstatus",
+  "hospitaltype",
+  "ich_category",
+  "tbimidlineshift",
+  "interfacilitytransfer",     # if present
+  "eddischargedisposition"     # if present (your derived ED transfer variable)
+)
+
+vars_cont <- vars_cont[vars_cont %in% names(minor_only)]
+vars_cat  <- vars_cat[vars_cat %in% names(minor_only)]
+
+group_var2 <- "trach_peg"
+g_all <- minor_only[[group_var2]]
+g_levels <- sort(unique(na.omit(g_all)))
+if (length(g_levels) != 2) stop("Need exactly 2 levels for trach_peg after filtering.", call. = FALSE)
+g1 <- g_levels[1]  # None
+g2 <- g_levels[2]  # Trach+PEG
+
+header_rows2 <- tibble::tibble(
+  variable = c("N (encounters)", paste0("N: ", group_var2, " = ", g1), paste0("N: ", group_var2, " = ", g2)),
+  level = "",
+  overall = c(as.character(nrow(minor_only)), "", ""),
+  group1 = c("", as.character(sum(g_all == g1, na.rm = TRUE)), ""),
+  group2 = c("", "", as.character(sum(g_all == g2, na.rm = TRUE))),
+  p_value = "",
+  missing = "",
+  type = "header",
+  note = ""
+)
+
+cont_rows2 <- purrr::map_dfr(vars_cont, ~ summarise_continuous(minor_only, .x, group_var2, g1, g2))
+cat_rows2  <- purrr::map_dfr(vars_cat,  ~ summarise_categorical(minor_only, .x, group_var2, g1, g2, max_levels = 30, show_other = TRUE))
+
+table_minority_trachpeg <- dplyr::bind_rows(header_rows2, cont_rows2, cat_rows2) %>%
+  dplyr::rename(
+    !!paste0(group_var2, "=", g1) := group1,
+    !!paste0(group_var2, "=", g2) := group2
+  )
+
+readr::write_csv(table_minority_trachpeg, file.path(output_dir, "table_nonminority_trachpeg_vs_none.csv"))
+              
+              
+              
+              
+              
