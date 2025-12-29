@@ -322,7 +322,9 @@ df_crani <- df_crani %>%
     statedesignation,
     tbicerebralmonitordays,
     tbimidlineshift,
-    hospitalprocedurestartdays
+    hospitalprocedurestartdays,
+    interfacilitytransfer,
+    eddischargedisposition
   )
 
 
