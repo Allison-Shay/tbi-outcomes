@@ -132,7 +132,10 @@ df_crani <- df_crani %>%
 
 # Merge df_crani with df_ecode
 df_crani <- df_crani %>%
-  left_join(df_ecode, by = "inc_key")
+  dplyr::left_join(
+    df_ecode %>% dplyr::select(ecode, intent, mechanism),
+    by = c("primaryecodeicd10" = "ecode")
+  )
 
 # Collapse by inc_key
 df_crani <- df_crani %>%
