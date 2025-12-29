@@ -83,11 +83,13 @@ df <- read.csv(make_path(year, "PUF_TRAUMA.csv"), colClasses = colClasses)
 df_ais <- read.csv(make_path(year, "PUF_AISDIAGNOSIS.csv"))
 df_icdproc <- read.csv(make_path(year, "PUF_ICDPROCEDURE.csv"))
 df_icddiag <- read.csv(make_path(year, "PUF_ICDDIAGNOSIS.csv"))
+df_ecode <- read.csv(make_path(year, "PUF_ECODE_LOOKUP.csv"))
 # lowercase column names
 colnames(df) <- tolower(colnames(df))
 colnames(df_ais) <- tolower(colnames(df_ais))
 colnames(df_icdproc) <- tolower(colnames(df_icdproc))
 colnames(df_icddiag) <- tolower(colnames(df_icddiag))
+colnames(df_ecode) <- tolower(colnames(df_ecode))
 filter_log <- log_step(df, "Initial cohort", filter_log)
 
 
@@ -127,6 +129,10 @@ df_crani <- df_crani %>%
 # Merge df_crani (patient-level) with df_icddiag
 df_crani <- df_crani %>%
   left_join(df_icddiag, by = "inc_key")
+
+# Merge df_crani with df_ecode
+df_crani <- df_crani %>%
+  left_join(df_ecode, by = "inc_key")
 
 # Collapse by inc_key
 df_crani <- df_crani %>%
