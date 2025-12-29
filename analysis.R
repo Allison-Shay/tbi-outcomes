@@ -32,10 +32,11 @@ transform_analysis_vars <- function(df) {
 
   # Safety check
   required_cols <- c(
-    "minority", "sex", "teachingstatus", "verificationlevel",
+    "ageyears", "iss", "minority", "sex", "teachingstatus", "verificationlevel",
     "trach", "gastro", "icpparench", "icpevdrain",
     "withdrawallst", "tbimidlineshift", "ich_category",
-    "statedesignation", "hospdischargedisposition", "totalgcs"
+    "statedesignation", "hospdischargedisposition", "totalgcs",
+    "race", "ethnicity", "primarymethodpayment", "hospitaltype", "intent", "mechanism"
   )
 
   missing_cols <- setdiff(required_cols, names(df))
@@ -61,10 +62,32 @@ transform_analysis_vars <- function(df) {
         ageyears > 75 ~ "Age >75 years",
         TRUE ~ NA_character_
       ) %>% factor(levels = c("Age 18-30 years", "Age 31-45 years", "Age 46-60 years", "Age 61-75 years", "Age >75 years")),
+      race = factor(race, levels = c("white", "americanindian", "asian", "black", "pacificislander", "raceother", "multiple"),
+                        labels = c("White", "American Indian", "Asian", "Black", "Pacific Islander", "Other", "Multiple")), 
+      ethnicity = factor(ethnicity, levels = c(1, 2),
+                   labels = c("Hispanic/Latino", "Non-Hispanic/Latino")),
 
       # Hospital characteristics
       teachingstatus = factor(teachingstatus),
       verificationlevel = factor(verificationlevel),
+      hospitaltype = case_when(
+        hospitaltype == 1  ~ "For profit",
+        hospitaltype == 2  ~ "Non-profit",
+        hospitaltype == 3  ~ "Government",
+        TRUE ~ NA_character_
+      ) %>% factor(levels = c("For profit", "Non-profit", "Government")),
+
+      # Insurance
+      primarymethodpayment = case_when(
+        primarymethodpayment == 1  ~ "Medicaid",
+        primarymethodpayment == 2  ~ "Other",
+        primarymethodpayment == 3  ~ "Self-pay",
+        primarymethodpayment == 4  ~ "Private insurance",
+        primarymethodpayment == 6  ~ "Medicare",
+        primarymethodpayment == 7  ~ "Other",
+        primarymethodpayment == 10  ~ "Other",
+        TRUE ~ NA_character_
+      ) %>% factor(levels = c("Medicaid", "Other", "Self-pay", "Private insurance", "Medicare")),
 
       # Procedures
       trach  = factor(trach, levels = c(0, 1), labels = c("No", "Yes")),
@@ -77,6 +100,32 @@ transform_analysis_vars <- function(df) {
                              levels = c(1, 2),
                              labels = c("Yes", "No")),
 
+      # Injury mechanism
+      intent = case_when(
+        intent == 1  ~ "Unintentional",
+        intent == 2  ~ "Self-inflicted",
+        intent == 3  ~ "Assault",
+        intent == 4  ~ "Undetermined",
+        intent == 5  ~ "Other",
+        TRUE ~ NA_character_
+      ) %>% factor(levels = c("Unintentional", "Self-inflicted", "Assault", "Undetermined", "Other")),
+      mechanism = case_when(
+        mechanism == 1 ~ "Other",
+        mechanism == 2 ~ "Other",
+        mechanism == 3  ~ "Fall",
+        mechanism == 4 ~ "Other",
+        mechanism == 5 ~ "Other",
+        mechanism == 6  ~ "Firearm",
+        mechanism == 7  ~ "Machinery",
+        mechanism >= 8 & mechanism <= 13  ~ "Motor vehicle traffic injury",
+        mechanism >= 14 & mechanism <= 16  ~ "Nontraffic transportation injury",
+        mechanism >= 17 & mechanism <= 20  ~ "Other",
+        mechanism == 21  ~ "Struck by/against",
+        mechanism >= 22  ~ "Other",
+        TRUE ~ NA_character_
+      ) %>% factor(levels = c("Other", "Fall", "Firearm", "Machinery", "Motor vehicle traffic injury", "Nontraffic transportation injury", "Struck by/against")),
+
+      
       # Injury characteristics
       tbimidlineshift = case_when(
         tbimidlineshift == 1 ~ "Yes",
