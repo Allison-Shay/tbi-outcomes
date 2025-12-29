@@ -186,6 +186,16 @@ df_crani$minority <- ifelse(
 )
 colnames(df_crani) <- tolower(colnames(df_crani))
 
+# Make race column
+df_crani$race <- NA_character_
+df_crani$race[df_crani$minority == 0] <- "white"
+idx_minority <- which(df_crani$minority == 1)
+race_mat <- df_crani[idx_minority, race_cols, drop = FALSE]
+race_count <- rowSums(race_mat, na.rm = TRUE)
+single_idx <- race_count == 1   # Exactly one race
+df_crani$race[idx_minority[single_idx]] <- race_cols[max.col(race_mat[single_idx, ], ties.method = "first")]
+df_crani$race[idx_minority[race_count > 1]] <- "multiple"   # Multiple races
+
 ### Finalize our column names (renaming columns if necessary since different years have different column names) ###
 
 # Rename certain variables 
@@ -279,8 +289,14 @@ df_crani <- df_crani %>%
     sex,
     ageyears,
     minority,
+    race,
+    ethnicity,
+    primarymethodpayment,
     verificationlevel,
     teachingstatus,
+    hospitaltype,
+    intent,
+    mechanism,
     totalgcs,
     iss,
     totalventdays,
