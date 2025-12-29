@@ -125,6 +125,15 @@ transform_analysis_vars <- function(df) {
         TRUE ~ NA_character_
       ) %>% factor(levels = c("Other", "Fall", "Firearm", "Machinery", "Motor vehicle traffic injury", "Nontraffic transportation injury", "Struck by/against")),
 
+      # Transfer
+      interfacilitytransfer = factor(interfacilitytransfer,
+                             levels = c(1, 2),
+                             labels = c("Yes", "No")),
+      eddischargedisposition = case_when(
+        eddischargedisposition == 11 ~ "ED transfer",
+        eddischargedisposition != 11  ~ "Not ED transfer",
+        TRUE ~ NA_character_
+      ) %>% factor(levels = c("ED transfer", "Not ED transfer")),
       
       # Injury characteristics
       tbimidlineshift = case_when(
