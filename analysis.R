@@ -1077,6 +1077,12 @@ vars_cont <- c("ageyears", "iss", "totalgcs")
 
 vars_cat <- c(
   "gcs_cat",
+  "age_cat",
+  "sex",
+  "race",
+  "ethnicity",
+  "primarymethodpayment",
+  "iss_cat",
   "mechanism",
   "intent",
   "verificationlevel",
@@ -1142,6 +1148,12 @@ vars_cont <- c("ageyears", "iss", "totalgcs")
 
 vars_cat <- c(
   "gcs_cat",
+  "age_cat",
+  "sex",
+  "race",
+  "ethnicity",
+  "primarymethodpayment",
+  "iss_cat",
   "mechanism",
   "intent",
   "verificationlevel",
